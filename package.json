@@ -1,0 +1,7 @@
+{
+  "name": "gemini-enem-analisys-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "@google/genai": "^0.1.0"
+  }
+}
