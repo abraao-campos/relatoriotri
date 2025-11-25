@@ -5,9 +5,11 @@ const BACKEND_URL = '/api/analyze';
 function csvToJson(csvContent) {
     if (!csvContent) return "[]";
     
-    // >> SOLUÇÃO FINAL PARA ERRO DE LEITURA: NORMALIZAÇÃO DE QUEBRA DE LINHA
-    // Trata \r\n (Windows), \r (Mac antigo) e \n (Linux/Web) para garantir a divisão correta.
-    const normalizedContent = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // >> SOLUÇÃO FINAL DE ROBUSTEZ: LIMPEZA AGRESSIVA E NORMALIZAÇÃO
+    let normalizedContent = csvContent
+        .replace(/\r\n/g, '\n') // 1. Trata Windows CRLF
+        .replace(/\r/g, '\n')   // 2. Trata Mac antigo CR
+        .replace(/[\u200B-\u200D\uFEFF]/g, ''); // 3. Remove BOM e caracteres invisíveis (zero-width spaces)
 
     // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
     const lines = normalizedContent.split('\n').filter(line => line.trim() !== '');
