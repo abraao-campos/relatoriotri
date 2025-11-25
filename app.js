@@ -89,7 +89,7 @@ async function sendToBackend(data) {
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = result.analysis;
         } else {
-            // Erro retornado pelo backend (Inclui o erro de "conteúdos obrigatórios")
+            // Erro retornado pelo backend
             statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = `Não foi possível obter a análise. Detalhes: ${result.error}`;
