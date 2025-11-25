@@ -202,10 +202,16 @@ function formatAnalysisOutput(analysisText) {
         
         let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
         
-        // Regex ULTRA-TOLERANTE: Captura qualquer número (inteiro ou decimal), ignorando qualquer coisa antes de dois pontos (:)
-        const regexMedia = /\*\*Média de Acertos\*\*[\s\S]*?:[\s]*(\d+(\.\d+)?)/i;
-        const regexMaior = /\*\*Maior Pontuação\*\*[\s\S]*?:[\s]*(\d+)/i;
-        const regexMenor = /\*\*Menor Pontuação\*\*[\s\S]*?:[\s]*(\d+)/i;
+        // >>> REGEX ULTRA-TOLERANTE: Captura o primeiro número após a menção da métrica, ignorando *qualquer* caractere no meio.
+        
+        // Média de Acertos: Captura número inteiro ou decimal (com . ou ,)
+        const regexMedia = /Média de Acertos.*?(\d+[\.,]?\d*)/is; 
+
+        // Maior Pontuação: Captura número inteiro
+        const regexMaior = /Maior Pontuação.*?(\d+)/is;
+
+        // Menor Pontuação: Captura número inteiro
+        const regexMenor = /Menor Pontuação.*?(\d+)/is;
         
         // Extrai os dados
         const media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
