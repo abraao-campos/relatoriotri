@@ -1,104 +1,155 @@
-// Importa o SDK do Google Gen AI
+// api/analyze.js
 const { GoogleGenAI } = require('@google/genai');
+const ai = new GoogleGenAI({}); // Assume que a chave API está configurada no ambiente
 
-// O NOVO NOME DA CHAVE QUE DEVE SER CONFIGURADA NO VERCEL
-const API_KEY_NAME = 'VERCEL_GEMINI_KEY';
+// Função para dividir o array de alunos em lotes
+function chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
 
-// Inicializa o SDK, passando explicitamente a chave
-const ai = new GoogleGenAI({ 
-    apiKey: process.env[API_KEY_NAME] 
-});
+// Função de Correção e Análise do Gemini
+async function analyze(resultadosContent, resultadosFilename) {
+    
+    // 1. Extrair o Gabarito e os Alunos
+    const alunos = JSON.parse(resultadosContent);
 
-// PROMPT OBRIGANDO A ESTRUTURAÇÃO DE SAÍDA EM 3 PARTES: JSON | MÉTRICAS SIMPLIFICADAS | OBSERVAÇÕES
-const FIXED_PROMPT = 
-  `Você é um motor de análise de resultados de provas focado em precisão. Sua tarefa é analisar o arquivo de resultados fornecido, que contém na sua PRIMEIRA LINHA o Gabarito Oficial sob o nome "Gabarito Oficial" (ou similar) e nas linhas seguintes as respostas dos alunos.
-
-  ### METODOLOGIA E RESULTADO:
-  1.  Identifique a linha do Gabarito Oficial e a utilize como base de correção.
-  2.  Ignore a linha do Gabarito Oficial na contagem final de alunos e na geração do JSON detalhado por aluno.
-  3.  O seu relatório final DEVE ser fornecido em três partes distintas, rigorosamente nesta ordem:
-  
-  --- PARTE 1: JSON DETALHADO POR ALUNO ---
-  Forneça uma lista JSON (Array de Objetos) com os resultados de CADA aluno. Esta lista DEVE estar obrigatoriamente dentro de um bloco de código Markdown \`\`\`json.
-  
-  Cada objeto no array deve conter as seguintes chaves:
-    - \`Aluno\`: (Nome do aluno)
-    - \`Total_Questoes\`: (Número total de questões na prova)
-    - \`Acertos\`: (Número de respostas corretas)
-    - \`Erros\`: (Número de respostas incorretas ou em branco)
-    - \`Percentual_Acerto\`: (Acertos / Total de Questoes * 100, formatado com uma casa decimal)
-  
-  --- PARTE 2: MÉTRICAS SIMPLIFICADAS (MARKDOWN) ---
-  O texto das métricas deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens formatados com negrito, contendo APENAS o número ou a contagem de acertos:
-  
-  1.  **Média de Acertos**: (O valor numérico da média de acertos, SEM o símbolo de % ou o nome 'Acertos'. Ex: 25)
-  2.  **Maior Pontuação**: (A maior pontuação alcançada, APENAS o número. Ex: 40)
-  3.  **Menor Pontuação**: (A menor pontuação alcançada, APENAS o número. Ex: 15)
-  
-  --- PARTE 3: OBSERVAÇÕES GERAIS (BLOCO DE CÓDIGO) ---
-  Forneça a análise em texto corrido (em parágrafos ou com bullet points) logo após a lista de métricas, dentro de um bloco de código Markdown **\`\`\`text** com o título **Observações Gerais:**.
-  
-  Este bloco DEVE incluir:
-  - O nome dos alunos que alcançaram a maior pontuação.
-  - O nome dos alunos que alcançaram a menor pontuação.
-  - Análise detalhada das áreas de acerto e dificuldade.
-
-  Abaixo, está o dado (Resultados dos Alunos) que também contém o Gabarito na primeira linha.
-  `;
-
-// Função principal da API
-module.exports = async (req, res) => {
-    if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Método não permitido. Use POST.' });
-        return;
+    // O Gabarito Oficial deve ser a primeira linha de dados.
+    if (alunos.length === 0) {
+        throw new Error("O arquivo de resultados não contém dados após a conversão.");
     }
 
-    // >> VERIFICAÇÃO CRÍTICA: Se a variável de ambiente não existe, retorne um erro único.
-    if (!process.env[API_KEY_NAME] || process.env[API_KEY_NAME].trim() === "") {
-        return res.status(500).json({ 
-            success: false, 
-            error: `ERRO CRÍTICO DE AMBIENTE (CÓDIGO: NO_KEY): A chave '${API_KEY_NAME}' não foi encontrada ou está vazia no servidor Vercel. Por favor, verifique se a variável está configurada para o ambiente 'Production' e faça um novo 'Redeploy'.` 
-        });
+    const gabaritoOficial = alunos[0];
+    const alunosParaCorrigir = alunos.slice(1); // O resto são os alunos
+    const totalQuestoes = Object.keys(gabaritoOficial).length - 1; // Nome + 45 questões = 46 colunas
+
+    if (alunosParaCorrigir.length === 0) {
+        throw new Error("O arquivo não contém marcações de alunos para corrigir.");
     }
-
-    try {
-        // 1. Receber o conteúdo do corpo da requisição
-        const { resultadosContent, resultadosFilename } = req.body; // Apenas um arquivo agora
-
-        if (!resultadosContent) {
-            res.status(400).json({ error: 'O conteúdo dos Resultados da Turma é obrigatório.' });
-            return;
-        }
-
-        // 2. Montar o conteúdo completo para o Gemini
-        const fullPrompt = 
-          `${FIXED_PROMPT}\n\n` +
-          `--- RESULTADOS DOS ALUNOS (${resultadosFilename}) ---\n` +
-          `${resultadosContent}`;
+    
+    // 2. Dividir os alunos em CHUNKS (Lotes de, no máximo, 15)
+    // 15 é um número seguro para o limite de tokens de saída.
+    const alunoChunks = chunkArray(alunosParaCorrigir, 15);
+    
+    let relatorioFinalDetalhado = [];
+    let relatoriosObservacoes = [];
+    let promptBase = '';
+    
+    // 3. Processar cada CHUNK
+    for (let i = 0; i < alunoChunks.length; i++) {
+        const chunk = alunoChunks[i];
         
-        // 3. Fazer a chamada à API do Gemini
+        // Constrói um objeto para o Gabarito e o chunk atual de alunos
+        const chunkData = [gabaritoOficial, ...chunk];
+        const chunkJsonString = JSON.stringify(chunkData, null, 2);
+        
+        let prompt;
+
+        // O prompt mais complexo (com análise) é enviado apenas para o primeiro lote (Chunk 0)
+        if (i === 0) {
+            prompt = `Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
+            
+            **Instruções de Saída:**
+            1. **Correção Detalhada (Bloco JSON):** Gere um Array JSON chamado 'relatorio_alunos' para CADA ALUNO corrigido neste bloco. O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador). O campo "Total_Questoes" deve ser **${totalQuestoes}**.
+            2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
+            3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
+            
+            Siga **EXATAMENTE** este formato para a saída (incluindo os delimitadores \`\`\`json e \`\`\`text):
+            
+            \`\`\`json
+            [
+              {"Aluno": "...", "Acertos": "...", "Erros": "...", "Percentual_Acerto": "...", "Total_Questoes": "${totalQuestoes}"},
+              ...
+            ]
+            \`\`\`
+            
+            **Média de Acertos:** (Valor da Média)
+            **Maior Pontuação:** (Valor do Máximo)
+            **Menor Pontuação:** (Valor do Mínimo)
+            
+            \`\`\`text
+            Observações Gerais:
+            [... Sua análise qualitativa aqui ...]
+            \`\`\`
+            
+            **Dados a Analisar (Gabarito + Alunos):**
+            ${chunkJsonString}`;
+            
+            promptBase = prompt; // Armazena o prompt base para referência
+
+        } else {
+            // Prompts simplificados (APENAS CORREÇÃO JSON) para os lotes subsequentes
+            prompt = `Continue a correção. Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir o desempenho dos alunos no JSON abaixo com base no Gabarito Oficial (primeira linha). O campo "Total_Questoes" deve ser **${totalQuestoes}**.
+            
+            Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' (sem as Métricas Chave e sem as Observações Gerais) seguindo o formato:
+            
+            \`\`\`json
+            [
+              {"Aluno": "...", "Acertos": "...", "Erros": "...", "Percentual_Acerto": "...", "Total_Questoes": "${totalQuestoes}"},
+              ...
+            ]
+            \`\`\`
+            
+            **Dados a Analisar (Gabarito + Alunos):**
+            ${chunkJsonString}`;
+        }
+        
+        // 4. Chamada ao Gemini para o lote atual
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro', 
-            contents: fullPrompt,
+            model: 'gemini-2.5-flash',
+            contents: prompt,
             config: {
-                temperature: 0.2, // Temperatura mais baixa para garantir precisão
+                // Configurações para forçar o JSON na primeira parte, mesmo que o modelo não retorne JSON puro.
+                // Isto aumenta a chance de sucesso na extração por Regex.
+                responseMimeType: 'text/plain', 
+                temperature: 0.1,
             }
         });
 
-        const analysisText = response.text;
+        const fullText = response.text.trim();
 
-        // 4. Retornar o resultado da análise para o frontend
-        res.status(200).json({
-            success: true,
-            analysis: analysisText
-        });
-
-    } catch (error) {
-        console.error("Erro na análise do Gemini:", error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Falha na comunicação com o motor de análise. A chave pode estar incorreta. Detalhes: ' + error.message,
-            details: error.message
-        });
+        // 5. Extração e Concatenção dos Resultados
+        
+        // Extrai o bloco JSON (relatório de alunos)
+        const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch) {
+            try {
+                // Tenta fazer o parsing para garantir que não está cortado e que é válido
+                const chunkRelatorio = JSON.parse(jsonMatch[1]);
+                relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
+            } catch (e) {
+                 // Se o JSON estiver cortado ou inválido (muito comum em chunks grandes),
+                 // o loop será interrompido e você obterá um erro claro.
+                 throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. A resposta do Gemini pode ter sido cortada. Tente reduzir o tamanho do lote.`);
+            }
+        } else {
+            throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
+        }
+        
+        // Guarda as métricas e observações APENAS do primeiro lote (Chunk 0)
+        if (i === 0) {
+            // Pega todo o texto, exceto o JSON, que contém as Métricas Chave e o Bloco TEXT
+            const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
+            relatoriosObservacoes.push(textAfterJson);
+        }
     }
-};
+
+    // 6. Montar o Relatório Final (Apenas do Chunk 0 + o JSON completo)
+    const relatorioJSONCompleto = `\`\`\`json\n${JSON.stringify(relatorioFinalDetalhado, null, 2)}\n\`\`\``;
+    
+    // Concatena o JSON completo com as métricas/observações do primeiro lote
+    const relatorioFinalCompleto = relatorioJSONCompleto + "\n\n" + relatoriosObservacoes.join('\n');
+
+
+    return {
+        // Envia o texto completo para o frontend para a extração final
+        analysis: relatorioFinalCompleto, 
+        // Você pode retornar o prompt base para debug, se necessário
+        promptUsed: promptBase 
+    };
+}
+
+module.exports = { analyze };
