@@ -1,9 +1,10 @@
-// api/analyze.js
+// api/analyze.js - Código Completo e Integrado para Serverless
+
 const { GoogleGenAI } = require('@google/genai');
-// IMPORTANTE: Certifique-se de que a variável de ambiente GEMINI_API_KEY está configurada!
+// A chave será carregada automaticamente se o nome for GEMINI_API_KEY
 const ai = new GoogleGenAI({}); 
 
-// Função para dividir o array de alunos em lotes
+// --- Função Helper: Chunking ---
 function chunkArray(array, chunkSize) {
     const chunks = [];
     for (let i = 0; i < array.length; i += chunkSize) {
@@ -12,46 +13,53 @@ function chunkArray(array, chunkSize) {
     return chunks;
 }
 
-// Função de Correção e Análise do Gemini
-async function analyze(resultadosContent, resultadosFilename) {
-    
-    // O BLOCO TRY...CATCH EXTERNO GARANTE QUE QUALQUER ERRO SEJA CAPTURADO 
-    // E DEVOLVIDO COMO UM ERRO CONTROLADO, EVITANDO O "Unexpected token 'A'" no frontend.
-    try {
-        // 1. Extrair o Gabarito e os Alunos
-        const alunos = JSON.parse(resultadosContent);
+// --- Handler Principal (Exportação) ---
+// Esta função é o ponto de entrada para a rota /api/analyze
 
-        // O Gabarito Oficial deve ser a primeira linha de dados.
-        if (alunos.length === 0) {
-            throw new Error("O arquivo de resultados não contém dados após a conversão.");
+module.exports = async (req, res) => {
+    
+    // Configura o header de Content-Type para JSON
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+    // Retorna 405 se o método não for POST
+    if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: "Método não permitido. Use POST." });
+    }
+
+    // O grande bloco try/catch captura erros críticos e garante que a função 
+    // termine com uma resposta HTTP correta (200, 400 ou 500).
+    try {
+        // --- 1. Extração de Dados ---
+        const { resultadosContent, resultadosFilename } = req.body;
+        const alunosOriginal = JSON.parse(resultadosContent);
+
+        if (alunosOriginal.length === 0) {
+            return res.status(400).json({ success: false, error: "O arquivo de resultados não contém dados após a conversão." });
         }
 
-        const gabaritoOficial = alunos[0];
-        const alunosParaCorrigir = alunos.slice(1); // O resto são os alunos
+        const gabaritoOficial = alunosOriginal[0];
+        const alunosParaCorrigir = alunosOriginal.slice(1);
         const totalQuestoes = Object.keys(gabaritoOficial).length - 1; 
 
         if (alunosParaCorrigir.length === 0) {
-            throw new Error("O arquivo não contém marcações de alunos para corrigir.");
+            return res.status(400).json({ success: false, error: "O arquivo não contém marcações de alunos para corrigir." });
         }
-        
-        // 2. Dividir os alunos em CHUNKS (Lotes de, no máximo, 15)
+
+        // --- 2. Chunking e Processamento do Gemini ---
         const alunoChunks = chunkArray(alunosParaCorrigir, 15);
         
         let relatorioFinalDetalhado = [];
         let relatoriosObservacoes = [];
         
-        // 3. Processar cada CHUNK
         for (let i = 0; i < alunoChunks.length; i++) {
             const chunk = alunoChunks[i];
-            
-            // Constrói um objeto para o Gabarito e o chunk atual de alunos
             const chunkData = [gabaritoOficial, ...chunk];
             const chunkJsonString = JSON.stringify(chunkData, null, 2);
             
             let prompt;
 
-            // O prompt mais complexo (com análise) é enviado apenas para o primeiro lote (Chunk 0)
             if (i === 0) {
+                // Prompt completo para o primeiro lote (inclui análise qualitativa)
                 prompt = `Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
                 
                 **Instruções de Saída:**
@@ -59,45 +67,20 @@ async function analyze(resultadosContent, resultadosFilename) {
                 2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
                 3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
                 
-                Siga **EXATAMENTE** este formato para a saída (incluindo os delimitadores \`\`\`json e \`\`\`text):
+                Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média de Acertos:** [...] **Maior Pontuação:** [...] **Menor Pontuação:** [...] \`\`\`text Observações Gerais: [...] \`\`\`
                 
-                \`\`\`json
-                [
-                  {"Aluno": "...", "Acertos": "...", "Erros": "...", "Percentual_Acerto": "...", "Total_Questoes": "${totalQuestoes}"},
-                  ...
-                ]
-                \`\`\`
-                
-                **Média de Acertos:** (Valor da Média)
-                **Maior Pontuação:** (Valor do Máximo)
-                **Menor Pontuação:** (Valor do Mínimo)
-                
-                \`\`\`text
-                Observações Gerais:
-                [... Sua análise qualitativa aqui ...]
-                \`\`\`
-                
-                **Dados a Analisar (Gabarito + Alunos):**
-                ${chunkJsonString}`;
+                **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
                 
             } else {
-                // Prompts simplificados (APENAS CORREÇÃO JSON) para os lotes subsequentes
+                // Prompt simplificado (APENAS CORREÇÃO JSON) para lotes subsequentes
                 prompt = `Continue a correção. Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir o desempenho dos alunos no JSON abaixo com base no Gabarito Oficial (primeira linha). O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 
-                Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' (sem as Métricas Chave e sem as Observações Gerais) seguindo o formato:
+                Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o formato: \`\`\`json [ {"Aluno": "...", "Acertos": "...", ...}, ...] \`\`\`
                 
-                \`\`\`json
-                [
-                  {"Aluno": "...", "Acertos": "...", "Erros": "...", "Percentual_Acerto": "...", "Total_Questoes": "${totalQuestoes}"},
-                  ...
-                ]
-                \`\`\`
-                
-                **Dados a Analisar (Gabarito + Alunos):**
-                ${chunkJsonString}`;
+                **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
             }
             
-            // 4. Chamada ao Gemini para o lote atual
+            // 3. Chamada à API e Tratamento de Erro (API)
             let response;
             try {
                 response = await ai.models.generateContent({
@@ -109,63 +92,57 @@ async function analyze(resultadosContent, resultadosFilename) {
                     }
                 });
             } catch (apiError) {
-                // Erro de API (e.g., chave inválida, problema de rede do Gemini)
-                throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Verifique sua chave API e logs de rede. Detalhe: ${apiError.message}`);
+                throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Verifique sua chave API. Detalhe: ${apiError.message}`);
             }
 
-
+            // 4. Extração e Concatenação
             const fullText = response.text.trim();
-
-            // 5. Extração e Concatenção dos Resultados
-            
-            // Extrai o bloco JSON (relatório de alunos)
             const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+            
             if (jsonMatch) {
                 try {
                     const chunkRelatorio = JSON.parse(jsonMatch[1]);
-                    // Verificação para garantir que o Gemini retornou dados (alguns modelos podem retornar JSON vazio em erro)
                     if (chunkRelatorio.length === 0) {
-                        throw new Error("O JSON de resposta do Gemini estava vazio. Verifique o prompt.");
+                        throw new Error("O JSON de resposta do Gemini estava vazio.");
                     }
                     relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
                 } catch (e) {
-                     // Erro de parsing (JSON mal formatado ou cortado)
                      throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
                 }
             } else {
                 throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
             }
             
-            // Guarda as métricas e observações APENAS do primeiro lote (Chunk 0)
             if (i === 0) {
-                // Pega todo o texto, exceto o JSON, que contém as Métricas Chave e o Bloco TEXT
                 const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
                 relatoriosObservacoes.push(textAfterJson);
             }
         }
 
-        // 6. Montar o Relatório Final
+        // --- 5. Montagem da Resposta Final ---
         const relatorioJSONCompleto = `\`\`\`json\n${JSON.stringify(relatorioFinalDetalhado, null, 2)}\n\`\`\``;
-        
-        // Concatena o JSON completo com as métricas/observações do primeiro lote
         const relatorioFinalCompleto = relatorioJSONCompleto + "\n\n" + relatoriosObservacoes.join('\n');
 
-
-        return {
+        // Retorna a resposta de sucesso com status 200
+        return res.status(200).json({
             success: true,
             analysis: relatorioFinalCompleto, 
             error: null 
-        };
+        });
 
     } catch (e) {
-        // Captura qualquer erro não tratado e formata como JSON de erro para o frontend
-        console.error("ERRO CRÍTICO NO BACKEND:", e.message);
-        return {
-            success: false,
-            analysis: null,
-            error: e.message // Retorna a mensagem de erro para o frontend
-        };
-    }
-}
+        // Se qualquer erro ocorrer (API, JSON.parse, etc.), ele é capturado aqui,
+        // garantindo que o Status 500 seja evitado e o frontend receba uma mensagem JSON controlada.
+        
+        // Determina o status: 400 para erros do usuário/input, 500 para falha interna ou de API
+        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações")) ? 400 : 500;
 
-module.exports = { analyze };
+        console.error(`ERRO CRÍTICO NO HANDLER (Status ${statusCode}):`, e.message);
+        
+        // Retorna a resposta de erro com o status apropriado
+        return res.status(statusCode).json({ 
+            success: false, 
+            error: `Falha no processamento: ${e.message}`
+        });
+    }
+};
