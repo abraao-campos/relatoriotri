@@ -1,45 +1,94 @@
-// ... (imports e setup da API)
+// Importa o SDK do Google Gen AI
 const { GoogleGenAI } = require('@google/genai');
 
+// A chave da API será lida automaticamente de GEMINI_API_KEY
 const ai = new GoogleGenAI({});
 
-// 📝 PROMPT FIXO: Instruções Detalhadas para Análise TRI (M2PL)
+// PROMPT SIMPLIFICADO: Instruções para Contagem de Acertos/Erros
 const FIXED_PROMPT = 
-  `Você é um motor de análise estatística especializado em **Teoria de Resposta ao Item (TRI)**.
+  `Você é um motor de análise de resultados de provas focado em precisão.
   
-  Sua tarefa é simular um processo de calibração e cálculo de proficiência utilizando o **Modelo Logístico de 2 Parâmetros (M2PL)**.
+  Sua tarefa é comparar a Matriz de Respostas dos Alunos com o Gabarito (Gabarito) e gerar um relatório de acertos e erros para cada aluno.
 
-  ### ATENÇÃO: DADOS DE ENTRADA E NORMALIZAÇÃO
-  Os dados a seguir foram pré-processados e estão formatados como **Strings JSON, representando Arrays de Objetos**. Use esta estrutura de dados diretamente para o cálculo.
-
-  --- FASE 1: BANCO DE DADOS DA PROVA ---
-  Este JSON contém as características de cada item (questão): Habilidade (H) e Gabarito.
+  ### DADOS DE ENTRADA:
+  Ambos os arquivos (Gabarito e Respostas) foram pré-processados e estão formatados como **Strings JSON, representando Arrays de Objetos**. Use esta estrutura de dados diretamente.
   
-  --- FASE 2: MATRIZ DE RESPOSTAS DOS ALUNOS ---
-  Este JSON contém as respostas marcadas por cada aluno.
+  --- FASE 1: GABARITO (JSON) ---
+  Contém a resposta correta para cada questão. A chave para a questão será o número da questão (Ex: "1", "2").
+  
+  --- FASE 2: RESPOSTAS DOS ALUNOS (JSON) ---
+  Contém as respostas de cada aluno. A chave para o nome do aluno é "Nome", e as demais chaves são os números das questões.
   
   ### METODOLOGIA E CÁLCULOS:
-  1. **Conversão Binária:** Converta as respostas dos alunos para uma Matriz de Respostas Binária (1 = Acerto, 0 = Erro), usando o Gabarito como chave.
-  2. **Calibração M2PL:** SIMULE a calibração dos itens (cálculo dos parâmetros 'a' - Discriminação e 'b' - Dificuldade) sobre a amostra de alunos fornecida.
-  3. **Proficiência TRI ($\theta$):** Calcule a proficiência ($\theta$) de cada aluno em escala logit (Proficiência bruta).
-  4. **Padronização ENEM:** Transforme a proficiência $\theta$ para a Escala ENEM, onde a Média $\approx 500$ e o Desvio Padrão ($\text{DP}$) $\approx 100$.
+  1. **Processamento:** Itere sobre a Matriz de Respostas. Para cada aluno, compare a resposta de cada questão com o Gabarito correspondente.
+  2. **Contagem:** Conte o número total de acertos e erros (incluindo questões em branco/sem marcação) por aluno.
+  3. **Relatório:** Gere um relatório final.
 
-  ### RESULTADO (FASE 3):
-  Seu relatório final **DEVE** ser fornecido no formato JSON com as seguintes chaves, seguido de um resumo em Markdown:
+  ### RESULTADO:
+  O seu relatório final **DEVE** ser fornecido no formato JSON com as seguintes chaves, seguido de um resumo em Markdown:
   
   - **relatorio_alunos_json**: Uma lista JSON com objetos, cada um contendo:
     - \`Aluno\`: (Nome do aluno)
-    - \`Proficiencia_TRI_Logit\`: (Valor de $\theta$)
-    - \`Proficiencia_ENEM_Padronizada\`: (Valor Padronizado)
+    - \`Total_Questoes\`: (Número total de questões na prova)
+    - \`Acertos\`: (Número de respostas corretas)
+    - \`Erros\`: (Número de respostas incorretas ou em branco)
+    - \`Percentual_Acerto\`: (Acertos / Total de Questoes * 100, formatado com uma casa decimal)
   
   - **resumo_executivo_markdown**: Um relatório em Markdown com:
-    - Média e DP da Proficiência Padronizada da turma.
-    - As 3 Habilidades (H) com o menor desempenho.
-    - Sugestões pedagógicas baseadas nas Habilidades fracas.
+    - Média de Acertos da Turma.
+    - O aluno com a maior pontuação e o aluno com a menor pontuação.
+    - Observações gerais sobre o desempenho da turma.
 
-  Abaixo, estão os dados. Seja rigoroso na separação dos dados de entrada e na aplicação do modelo TRI M2PL.
+  Abaixo, estão os dados. Seja rigoroso na separação dos dados de entrada e na comparação do gabarito.
   `;
 
-// ... (o restante do código analyze.js permanece o mesmo, pois o corpo da requisição é tratado da mesma forma)
+// Função principal da API
 module.exports = async (req, res) => {
-// ...
+    if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Método não permitido. Use POST.' });
+        return;
+    }
+
+    try {
+        // 1. Receber os DOIS conteúdos do corpo da requisição
+        const { gabaritoContent, resultadosContent, gabaritoFilename, resultadosFilename } = req.body;
+
+        if (!gabaritoContent || !resultadosContent) {
+            res.status(400).json({ error: 'Os conteúdos do Gabarito e dos Resultados são obrigatórios.' });
+            return;
+        }
+
+        // 2. Montar o conteúdo completo para o Gemini com ambos os arquivos
+        const fullPrompt = 
+          `${FIXED_PROMPT}\n\n` +
+          `--- GABARITO (${gabaritoFilename}) ---\n` +
+          `${gabaritoContent}\n\n` +
+          `--- RESPOSTAS DOS ALUNOS (${resultadosFilename}) ---\n` +
+          `${resultadosContent}`;
+        
+        // 3. Fazer a chamada à API do Gemini
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro', 
+            contents: fullPrompt,
+            config: {
+                temperature: 0.2, // Temperatura mais baixa para garantir precisão
+            }
+        });
+
+        const analysisText = response.text;
+
+        // 4. Retornar o resultado da análise para o frontend
+        res.status(200).json({
+            success: true,
+            analysis: analysisText
+        });
+
+    } catch (error) {
+        console.error("Erro na análise do Gemini:", error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Falha na comunicação com o motor de análise. O servidor pode estar sobrecarregado ou a API Key expirou. Detalhes: ' + error.message,
+            details: error.message
+        });
+    }
+};
