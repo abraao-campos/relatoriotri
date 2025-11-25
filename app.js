@@ -166,20 +166,63 @@ async function sendToBackend(data) {
 }
 
 
-// >> NOVA FUNÇÃO: Transforma a resposta do Gemini em HTML formatado
+// >> FUNÇÃO DE FORMATAÇÃO E RECALCULO
 function formatAnalysisOutput(analysisText) {
+    let media = 'N/A';
+    let maior = 'N/A';
+    let menor = 'N/A';
+    let totalQuestoes = 'N/A';
+
     try {
         // 1. Encontra e extrai o bloco JSON de ALUNOS
         const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
         
         if (!jsonMatch) {
-            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado.</p><pre>' + analysisText + '</pre>';
+            // Se o JSON não for encontrado, tentamos extrair o resumo por Regex como fallback
+            const regexMedia = /Média de Acertos.*?(\d+[\.,]?\d*)/is; 
+            const regexMaior = /Maior Pontuação.*?(\d+)/is;
+            const regexMenor = /Menor Pontuação.*?(\d+)/is;
+
+            const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
+            const jsonBlockEndIndex = jsonMatch ? jsonMatch.index + jsonMatch[0].length : 0;
+            const obsBlockStartIndex = obsMatch ? obsMatch.index : analysisText.length;
+            let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
+
+            media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
+            maior = metricasMarkdown.match(regexMaior)?.[1] || 'N/A';
+            menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
+            
+            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado. Os dados abaixo são extraídos do texto e podem ser imprecisos.</p>' + formatHtmlOutput({ relatorio_alunos: [], media, maior, menor, totalQuestoes: 'N/A', analysisText });
         }
         
         const jsonString = jsonMatch[1];
         const relatorio_alunos = JSON.parse(jsonString); 
         
-        // 2. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (robusto contra formatação ```text)
+        // 2. RECALCULAR MÉTRICAS (GARANTINDO 100% DE PRECISÃO)
+        let totalAcertos = 0;
+        let maiorPontuacao = 0;
+        let menorPontuacao = Infinity; // Inicia com um valor alto para ser facilmente substituído
+
+        if (relatorio_alunos.length > 0) {
+            // Define o total de questões baseado no primeiro aluno
+            totalQuestoes = relatorio_alunos[0].Total_Questoes;
+
+            relatorio_alunos.forEach(aluno => {
+                const acertos = parseInt(aluno.Acertos, 10);
+                if (!isNaN(acertos)) {
+                    totalAcertos += acertos;
+                    maiorPontuacao = Math.max(maiorPontuacao, acertos);
+                    menorPontuacao = Math.min(menorPontuacao, acertos);
+                }
+            });
+
+            // Calcula a média e formata para 2 casas decimais
+            media = (totalAcertos / relatorio_alunos.length).toFixed(2);
+            maior = maiorPontuacao;
+            menor = menorPontuacao;
+        }
+
+        // 3. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (robusto contra formatação ```text)
         const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
         let observacoesTexto = 'Nenhuma observação detalhada foi fornecida.';
         
@@ -187,103 +230,114 @@ function formatAnalysisOutput(analysisText) {
             // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
             observacoesTexto = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
         }
-        
-        // 3. Extrai o texto da seção de MÉTRICAS (entre o JSON de alunos e o bloco de observações)
-        const jsonBlockEndIndex = jsonMatch.index + jsonMatch[0].length;
-        const obsBlockStartIndex = obsMatch ? obsMatch.index : analysisText.length;
-        
-        let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
-        
-        // Regex Ultra-Tolerante para extração dos valores
-        const regexMedia = /Média de Acertos.*?(\d+[\.,]?\d*)/is; 
-        const regexMaior = /Maior Pontuação.*?(\d+)/is;
-        const regexMenor = /Menor Pontuação.*?(\d+)/is;
-        
-        // Extrai os dados
-        const media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
-        const maior = metricasMarkdown.match(regexMaior)?.[1] || 'N/A';
-        const menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
-        
-        
-        // >> Captura o total de questões do primeiro aluno, se houver
-        const totalQuestoes = relatorio_alunos.length > 0 ? relatorio_alunos[0].Total_Questoes : 'N/A';
-        
-        // --- 4. Monta o HTML ---
-        
-        let htmlOutput = `
-            <h4 style="margin-top: 5px; color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
-                Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
-            </h4>
-            <h3>Relatório Detalhado por Aluno</h3>
-            <hr>
-        `;
-        
-        // Formata o relatório por aluno
-        relatorio_alunos.forEach(aluno => {
-            const percent = parseFloat(aluno.Percentual_Acerto);
-            const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
 
-            htmlOutput += `
-                <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
-                    <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
-                    <ul style="list-style-type: none; padding: 0;">
-                        <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
-                        <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
-                        <li><strong>% de Acerto:</strong> <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
-                    </ul>
-                </div>
-            `;
+        // 4. Monta o HTML final com os dados recalculados
+        return formatHtmlOutput({
+            relatorio_alunos,
+            media: media.replace('.', ','), // Formata de volta para padrão brasileiro
+            maior,
+            menor,
+            totalQuestoes,
+            observacoesTexto
         });
-        
-        // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
-        let observacoesHtml = observacoesTexto
-            .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
-            .replace(/\*/g, '•') // Converte * em •
-            .replace(/\n/g, '<br>') // Converte \n em <br>
-            .trim();
-
-
-        htmlOutput += `
-            <br>
-            <h3>Análise Geral de Desempenho da Turma</h3>
-            
-            <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
-                <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
-                    Resumo Executivo da Turma
-                </h4>
-                
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                    
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="color: #007bff;">Média de Acertos</strong>
-                        <h4 style="margin: 0; color: #007bff;">${media} Acertos</h4>
-                    </div>
-                    
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="color: #28a745;">Maior Pontuação</strong>
-                        <h4 style="margin: 0; color: #28a745;">${maior} Acertos</h4>
-                    </div>
-                    
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="color: #dc3545;">Menor Pontuação</strong>
-                        <h4 style="margin: 0; color: #dc3545;">${menor} Acertos</h4>
-                    </div>
-                </div>
-
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
-                    <div style="padding-left: 5px; color: #555;">
-                        ${observacoesHtml}
-                    </div>
-                </div>
-
-            </div>
-        `;
-
-        return htmlOutput;
 
     } catch (e) {
-        console.error("Erro na Formatação do JSON:", e);
-        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
+        console.error("Erro na Formatação/Recálculo do JSON:", e);
+        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. O relatório bruto está abaixo. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
     }
+}
+
+
+// >> NOVA FUNÇÃO: Monta o HTML, separada para organização
+function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto, analysisText }) {
+    
+    // Processamento do texto de observações se vier da extração do Gemini
+    let obsTextoFinal = observacoesTexto;
+    if (typeof analysisText !== 'undefined' && typeof observacoesTexto === 'undefined') {
+         // Tenta extrair observações se o JSON falhou, mas temos o texto bruto
+        const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
+        if (obsMatch && obsMatch[1]) {
+            obsTextoFinal = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
+        } else {
+             obsTextoFinal = 'Nenhuma observação detalhada foi fornecida.';
+        }
+    }
+
+
+    let htmlOutput = `
+        <h4 style="margin-top: 5px; color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+            Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
+        </h4>
+        <h3>Relatório Detalhado por Aluno</h3>
+        <hr>
+    `;
+    
+    // Formata o relatório por aluno
+    relatorio_alunos.forEach(aluno => {
+        const percent = parseFloat(aluno.Percentual_Acerto.replace(',', '.')); // Garante que a vírgula funcione no parseFloat
+        const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
+
+        htmlOutput += `
+            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
+                <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
+                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
+                    <li><strong>% de Acerto:</strong> <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
+                </ul>
+            </div>
+        `;
+    });
+    
+    // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
+    let observacoesHtml = obsTextoFinal
+        .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
+        .replace(/\*/g, '•') // Converte * em •
+        .replace(/\n/g, '<br>') // Converte \n em <br>
+        .trim();
+
+
+    htmlOutput += `
+        <br>
+        <h3>Análise Geral de Desempenho da Turma</h3>
+        
+        <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
+            <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
+                Resumo Executivo da Turma
+            </h4>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                
+                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #007bff;">Média de Acertos</strong>
+                    <h4 style="margin: 0; color: #007bff;">${media} Acertos</h4>
+                </div>
+                
+                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #28a745;">Maior Pontuação</strong>
+                    <h4 style="margin: 0; color: #28a745;">${maior} Acertos</h4>
+                </div>
+                
+                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #dc3545;">Menor Pontuação</strong>
+                    <h4 style="margin: 0; color: #dc3545;">${menor} Acertos</h4>
+                </div>
+            </div>
+
+            <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
+                <div style="padding-left: 5px; color: #555;">
+                    ${observacoesHtml}
+                </div>
+            </div>
+
+        </div>
+    `;
+
+    // Se a análise do Gemini falhou em parte, mostra o erro no fim
+    if (typeof analysisText !== 'undefined' && typeof observacoesTexto === 'undefined') {
+        htmlOutput += `<pre style="color: red; margin-top: 20px;">Relatório Bruto do Gemini (JSON não formatado): ${analysisText}</pre>`;
+    }
+
+    return htmlOutput;
 }
