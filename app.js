@@ -66,53 +66,45 @@ function readFileAsText(file) {
 document.getElementById('analiseForm').addEventListener('submit', async function(e) {
     e.preventDefault(); 
     
-    const gabaritoInput = document.getElementById('arquivoGabarito');
-    const resultadosInput = document.getElementById('arquivoResultados');
+    const resultadosInput = document.getElementById('arquivoResultados'); // APENAS UM INPUT
     const statusDiv = document.getElementById('status');
     const resultadoTexto = document.getElementById('resultadoTexto');
     const botao = document.getElementById('botaoAnalisar');
 
     // Verificação básica dos arquivos
-    if (gabaritoInput.files.length === 0 || resultadosInput.files.length === 0) {
-        alert("Por favor, selecione ambos os arquivos: Gabarito e Resultados.");
+    if (resultadosInput.files.length === 0) {
+        alert("Por favor, selecione o Arquivo de Resultados da Turma.");
         return;
     }
 
     // Preparar o estado da interface
     botao.disabled = true;
     statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '⏳ Lendo arquivos no seu navegador...';
+    statusDiv.innerHTML = '⏳ Lendo arquivo no seu navegador...';
     statusDiv.classList.add('loading');
     resultadoTexto.textContent = 'A análise está sendo processada pelo Gemini. Por favor, aguarde...';
 
-    const arquivoGabarito = gabaritoInput.files[0];
     const arquivoResultados = resultadosInput.files[0];
 
     try {
-        // Leitura de ambos os arquivos de forma paralela
-        const [rawGabarito, rawResultados] = await Promise.all([
-            readFileAsText(arquivoGabarito),
-            readFileAsText(arquivoResultados)
-        ]);
+        // Leitura do arquivo
+        const rawResultados = await readFileAsText(arquivoResultados);
         
-        // NOVO PASSO: CONVERTER RAW TEXT (CSV) PARA JSON STRING
+        // CONVERTER RAW TEXT (CSV) PARA JSON STRING
         statusDiv.innerHTML = '✨ Pré-processando dados no navegador...';
 
-        const jsonGabarito = csvToJson(rawGabarito);
         const jsonResultados = csvToJson(rawResultados);
 
         // Verifica se a conversão resultou em JSON vazio
-        if (jsonGabarito === "[]" || jsonResultados === "[]") {
-             alert("A conversão JSON falhou. Seus arquivos CSV podem estar vazios ou o formato de codificação é incompatível.");
+        if (jsonResultados === "[]") {
+             alert("A conversão JSON falhou. Seu arquivo CSV pode estar vazio ou o formato de codificação é incompatível.");
              botao.disabled = false;
              return;
         }
 
         // Dados a serem enviados para o backend
         const dadosParaEnvio = {
-            gabaritoContent: jsonGabarito, 
             resultadosContent: jsonResultados,
-            gabaritoFilename: arquivoGabarito.name,
             resultadosFilename: arquivoResultados.name
         };
 
@@ -121,7 +113,7 @@ document.getElementById('analiseForm').addEventListener('submit', async function
 
     } catch (error) {
         // Erro de leitura de arquivo (local)
-        statusDiv.innerHTML = `❌ Erro ao ler um dos arquivos: ${error.message}`;
+        statusDiv.innerHTML = `❌ Erro ao ler o arquivo: ${error.message}`;
         botao.disabled = false;
 
     }
@@ -213,7 +205,7 @@ function formatAnalysisOutput(analysisText) {
         const menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
         
         
-        // >> NOVA LÓGICA: Captura o total de questões do primeiro aluno, se houver
+        // >> Captura o total de questões do primeiro aluno, se houver
         const totalQuestoes = relatorio_alunos.length > 0 ? relatorio_alunos[0].Total_Questoes : 'N/A';
         
         // --- 4. Monta o HTML ---
