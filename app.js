@@ -222,13 +222,32 @@ function formatAnalysisOutput(analysisText) {
             `;
         });
         
-        // 4. Converte o Resumo Markdown em HTML simples (pode ser melhorado com bibliotecas, mas isso funciona para o básico)
-        const resumoHtml = resumoMarkdown
-            .replace(/##/g, '<h4>') // Títulos (deve transformar ## Resumo Executivo em <h4>)
-            .replace(/\*/g, '•') // Listas
-            .replace(/\n/g, '<br>'); // Quebra de linha
+        // >> CORREÇÃO E MELHORIA DE LAYOUT DO RESUMO EXECUTIVO <<
+        
+        // 4. Converte o Resumo Markdown em HTML simples com CSS
+        let resumoHtml = resumoMarkdown
+            // Remove o título principal (que será recriado no HTML)
+            .replace(/^## Resumo Executivo da Turma/, '')
+            // Enfatiza o texto "Observações Gerais"
+            .replace(/Observações Gerais:/i, '<strong>Observações Gerais:</strong>')
+            // Converte listas (quebras de linha em <ul><li>) e substitui * por •
+            .replace(/\n\*/g, '<br>•')
+            // Converte as demais quebras de linha em <br>
+            .replace(/\n/g, '<br>'); 
             
-        htmlOutput += `<br><h3>Análise Geral de Desempenho da Turma</h3><hr><div>${resumoHtml}</div>`;
+        // Estrutura o bloco final
+        htmlOutput += `
+            <br>
+            <h3>Análise Geral de Desempenho da Turma</h3>
+            <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
+                <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
+                    Resumo Executivo da Turma
+                </h4>
+                <div>
+                    ${resumoHtml}
+                </div>
+            </div>
+        `;
 
         return htmlOutput;
 
