@@ -177,25 +177,34 @@ async function sendToBackend(data) {
 // >> NOVA FUNÇÃO: Transforma a resposta do Gemini em HTML formatado
 function formatAnalysisOutput(analysisText) {
     try {
-        // 1. Encontra e extrai o bloco JSON (relatorio_alunos_json)
+        // 1. Encontra e extrai o bloco JSON (o array de alunos)
         const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
         
         if (!jsonMatch) {
             // Se o JSON não for encontrado, retorna o texto bruto do Gemini
-            return '<h3>Relatório Completo</h3>' + analysisText.replace(/\n/g, '<br>');
+            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado. Verifique o texto bruto:</p><pre>' + analysisText + '</pre>';
         }
         
         const jsonString = jsonMatch[1];
-        const report = JSON.parse(jsonString);
+        // Parseia a lista de alunos (Array) diretamente
+        const relatorio_alunos = JSON.parse(jsonString); 
         
-        // 2. Encontra e extrai o resumo em Markdown (resumo_executivo_markdown)
-        const markdownMatch = analysisText.match(/## Resumo Executivo\s+([\s\S]*)/i);
-        const resumoMarkdown = markdownMatch ? markdownMatch[0] : '## Resumo Executivo (Não encontrado)';
+        // 2. Extrai TUDO o que vem depois do bloco de código JSON (o resumo em Markdown)
+        const jsonBlockEndIndex = jsonMatch.index + jsonMatch[0].length;
+        let resumoMarkdown = analysisText.substring(jsonBlockEndIndex).trim();
+        
+        // Remove quaisquer quebras de linha ou espaços remanescentes antes do título.
+        resumoMarkdown = resumoMarkdown.replace(/^[\s\r\n]+/g, '');
+
+        // Fallback: se o resumo estiver vazio após a extração.
+        if (resumoMarkdown.length < 10) {
+             resumoMarkdown = '## Resumo Executivo da Turma\n\nNenhuma análise geral foi fornecida pelo Gemini (Resposta muito curta).';
+        }
         
         let htmlOutput = '<h3>Relatório Detalhado por Aluno</h3><hr>';
         
         // 3. Formata o relatório por aluno
-        report.relatorio_alunos_json.forEach(aluno => {
+        relatorio_alunos.forEach(aluno => {
             const percent = parseFloat(aluno.Percentual_Acerto);
             // Escolhe a cor com base no desempenho
             const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
@@ -215,7 +224,7 @@ function formatAnalysisOutput(analysisText) {
         
         // 4. Converte o Resumo Markdown em HTML simples (pode ser melhorado com bibliotecas, mas isso funciona para o básico)
         const resumoHtml = resumoMarkdown
-            .replace(/##/g, '<h4>') // Títulos
+            .replace(/##/g, '<h4>') // Títulos (deve transformar ## Resumo Executivo em <h4>)
             .replace(/\*/g, '•') // Listas
             .replace(/\n/g, '<br>'); // Quebra de linha
             
@@ -226,6 +235,6 @@ function formatAnalysisOutput(analysisText) {
     } catch (e) {
         // Se houver erro na formatação (JSON mal formado), retorna o texto bruto com erro
         console.error("Erro na Formatação do JSON:", e);
-        return '<h3>Erro ao processar o JSON de Resultados</h3><p>O Gemini pode ter retornado um JSON inválido. Verifique o texto bruto abaixo:</p><pre>' + analysisText + '</pre>';
+        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. Verifique se o Gemini retornou os dados no formato esperado. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
     }
 }
