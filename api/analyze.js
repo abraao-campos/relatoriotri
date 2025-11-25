@@ -6,10 +6,17 @@ const ai = new GoogleGenAI({});
 
 // 📝 PROMPT FIXO: Instruções Detalhadas para Análise TRI (M2PL)
 const FIXED_PROMPT = 
-  `Você é um motor de análise estatística especializado em **Teoria de Resposta ao Item (TRI)**, utilizando o **Modelo Logístico de 2 Parâmetros (M2PL)**.
-
-  Sua tarefa é simular um processo de calibração e cálculo de proficiência com base nos dois conjuntos de dados fornecidos abaixo:
+  `Você é um motor de análise estatística especializado em **Teoria de Resposta ao Item (TRI)**.
   
+  Sua tarefa primordial é **pré-processar e interpretar** os dois conjuntos de dados brutos fornecidos (Gabarito e Respostas dos Alunos), que podem estar em formatos variados (CSV, JSON, Texto Delimitado), para **garantir a consistência** antes do cálculo.
+
+  ### FASE DE INTERPRETAÇÃO E NORMALIZAÇÃO DE DADOS:
+  1. **Identificação do Formato:** Determine automaticamente o separador (vírgula, ponto e vírgula, tabulação) e o tipo de codificação (se aplicável).
+  2. **Mapeamento de Colunas:** Para a Matriz de Respostas, identifique qual coluna representa o 'Nome do Aluno' e quais colunas representam as 'Respostas'.
+  3. **Validação:** Descarte quaisquer linhas de cabeçalho ou rodapé irrelevantes.
+  
+  Após a interpretação e normalização, realize a simulação do cálculo TRI M2PL conforme instruído nas fases seguintes.
+
   --- FASE 1: BANCO DE DADOS DA PROVA ---
   Este arquivo contém as características de cada item (questão): Habilidade (H) e Gabarito.
   
@@ -19,7 +26,7 @@ const FIXED_PROMPT =
   ### METODOLOGIA E CÁLCULOS:
   1. **Conversão Binária:** Converta as respostas dos alunos para uma Matriz de Respostas Binária (1 = Acerto, 0 = Erro), usando o Gabarito (Gabarito) como chave.
   2. **Calibração M2PL:** SIMULE a calibração dos itens (cálculo dos parâmetros 'a' - Discriminação e 'b' - Dificuldade) sobre a amostra de alunos fornecida.
-  3. **Proficiência TRI ($\theta$):** Calcule a proficiência ($\theta$) de cada aluno em escala logit (Proficiência bruta) com base nos parâmetros 'a' e 'b' simulados.
+  3. **Proficiência TRI ($\theta$):** Calcule a proficiência ($\theta$) de cada aluno em escala logit (Proficiência bruta).
   4. **Padronização ENEM:** Transforme a proficiência $\theta$ para a Escala ENEM, onde a Média $\approx 500$ e o Desvio Padrão ($\text{DP}$) $\approx 100$.
 
   ### RESULTADO (FASE 3):
@@ -45,11 +52,14 @@ module.exports = async (req, res) => {
         return;
     }
 
+    // NOVO BLOCO: Esta estrutura é a responsável por receber os dados do app.js
     try {
         // 1. Receber os DOIS conteúdos do corpo da requisição
         const { gabaritoContent, resultadosContent, gabaritoFilename, resultadosFilename } = req.body;
 
+        // VERIFICAÇÃO FINAL: Se os conteúdos vieram nulos ou vazios, retorna erro 400
         if (!gabaritoContent || !resultadosContent) {
+            // Este bloco retornará o erro que você viu se a leitura falhar
             res.status(400).json({ error: 'Os conteúdos do Gabarito e dos Resultados são obrigatórios.' });
             return;
         }
@@ -64,11 +74,9 @@ module.exports = async (req, res) => {
         
         // 3. Fazer a chamada à API do Gemini
         const response = await ai.models.generateContent({
-            // Usamos um modelo mais capaz, pois a complexidade de simular TRI é alta.
-            model: 'gemini-2.5-pro', // Modelo PRO para análise complexa e estruturada
+            model: 'gemini-2.5-pro', 
             contents: fullPrompt,
             config: {
-                // Aumenta a temperatura para permitir que o modelo simule a análise estatística
                 temperature: 0.5, 
             }
         });
