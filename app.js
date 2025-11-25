@@ -188,12 +188,13 @@ function formatAnalysisOutput(analysisText) {
         const relatorio_alunos = JSON.parse(jsonString); 
         
         // 2. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (Novo e mais robusto)
-        const obsMatch = analysisText.match(/```text\s*Observações Gerais:([\s\S]*?)\n```/i);
+        // O bloco começa com ```text e termina com ```
+        const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
         let observacoesTexto = 'Nenhuma observação detalhada foi fornecida.';
         
         if (obsMatch && obsMatch[1]) {
-            // Se o bloco '```text' for encontrado, pegamos seu conteúdo.
-            observacoesTexto = obsMatch[1].trim();
+            // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
+            observacoesTexto = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
         }
         
         // 3. Extrai o texto da seção de MÉTRICAS (entre o JSON de alunos e o bloco de observações)
@@ -202,10 +203,11 @@ function formatAnalysisOutput(analysisText) {
         
         let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
         
-        // Regex mais simples para extrair os valores-chave do texto Markdown das Métricas
-        const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+)/i;
-        const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*([^.]+)/i;
-        const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*([^.]+)/i;
+        // Regex para extrair APENAS NÚMEROS (inteiros ou decimais)
+        // O prompt foi ajustado para gerar apenas o número na lista Markdown
+        const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+(\.\d+)?)/i;
+        const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*(\d+)/i;
+        const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*(\d+)/i;
         
         // Extrai os dados
         const media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
@@ -261,12 +263,12 @@ function formatAnalysisOutput(analysisText) {
                     
                     <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
                         <strong style="color: #28a745;">Maior Pontuação</strong>
-                        <h4 style="margin: 0; color: #28a745;">${maior}</h4>
+                        <h4 style="margin: 0; color: #28a745;">${maior} Acertos</h4>
                     </div>
                     
                     <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
                         <strong style="color: #dc3545;">Menor Pontuação</strong>
-                        <h4 style="margin: 0; color: #dc3545;">${menor}</h4>
+                        <h4 style="margin: 0; color: #dc3545;">${menor} Acertos</h4>
                     </div>
                 </div>
 
