@@ -1,10 +1,8 @@
-// api/analyze.js - Código Final com Forçamento de Variável de Ambiente
+// api/analyze.js - Código Final com Robustez de Extração JSON
 
 const { GoogleGenAI } = require('@google/genai');
 
-// FORÇA A UTILIZAÇÃO DA VARIÁVEL DE AMBIENTE CHAVE
-// A variável deve ser nomeada como GEMINI_API_KEY no painel do seu host.
-// Se o nome no seu host for DIFERENTE (ex: AI_KEY), mude o nome aqui: process.env.AI_KEY
+// Força a utilização da variável de ambiente CHAVE
 const ai = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY 
 }); 
@@ -99,18 +97,33 @@ module.exports = async (req, res) => {
                 throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Verifique sua chave API. Detalhe: ${apiError.message}`);
             }
 
-            // 4. Extração e Concatenação
+            // 4. EXTRAÇÃO ROBUSTA E CONCATENAÇÃO
             const fullText = response.text.trim();
             const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
             
             if (jsonMatch) {
+                let jsonString = jsonMatch[1].trim(); // Pega o conteúdo interno e faz um trim inicial
+
+                // Tenta ser mais robusto: isola o conteúdo entre o primeiro '[' e o último ']'
+                // Isso remove qualquer caractere extra que o Gemini possa ter colocado após o JSON
+                const firstBracket = jsonString.indexOf('[');
+                const lastBracket = jsonString.lastIndexOf(']');
+
+                if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+                    // Extrai apenas a parte que é JSON válido (do '[' ao ']')
+                    jsonString = jsonString.substring(firstBracket, lastBracket + 1);
+                }
+                
                 try {
-                    const chunkRelatorio = JSON.parse(jsonMatch[1]);
+                    // Tenta fazer o parsing da string isolada
+                    const chunkRelatorio = JSON.parse(jsonString); 
+                    
                     if (chunkRelatorio.length === 0) {
                         throw new Error("O JSON de resposta do Gemini estava vazio.");
                     }
                     relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
                 } catch (e) {
+                     // Retorna a mensagem de erro detalhada
                      throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
                 }
             } else {
@@ -118,6 +131,7 @@ module.exports = async (req, res) => {
             }
             
             if (i === 0) {
+                // O restante da lógica de extração das métricas/observações permanece inalterada
                 const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
                 relatoriosObservacoes.push(textAfterJson);
             }
