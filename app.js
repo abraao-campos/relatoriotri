@@ -222,30 +222,73 @@ function formatAnalysisOutput(analysisText) {
             `;
         });
         
-        // >> CORREÇÃO E MELHORIA DE LAYOUT DO RESUMO EXECUTIVO <<
+        // >> MELHORIA DE LAYOUT DO RESUMO EXECUTIVO COM CARDS <<
         
-        // 4. Converte o Resumo Markdown em HTML simples com CSS
-        let resumoHtml = resumoMarkdown
-            // Remove o título principal (que será recriado no HTML)
-            .replace(/^## Resumo Executivo da Turma/, '')
-            // Enfatiza o texto "Observações Gerais"
-            .replace(/Observações Gerais:/i, '<strong>Observações Gerais:</strong>')
-            // Converte listas (quebras de linha em <ul><li>) e substitui * por •
-            .replace(/\n\*/g, '<br>•')
-            // Converte as demais quebras de linha em <br>
-            .replace(/\n/g, '<br>'); 
-            
-        // Estrutura o bloco final
+        // Expressões Regulares para extrair os valores-chave do texto Markdown
+        const regexMedia = /Média de Acertos da Turma:\s*(\d+)/i;
+        const regexMaior = /O aluno com a maior pontuação e o aluno com a menor pontuação\s*.*Maior pontuação:\s*([^,]+)/i;
+        const regexMenor = /O aluno com a maior pontuação e o aluno com a menor pontuação\s*.*Menor pontuação:\s*([^.]+)/i;
+        const regexObservacoes = /Observações gerais sobre o desempenho da turma:\s*([\s\S]*)/i;
+        
+        // Extrai os dados
+        const media = resumoMarkdown.match(regexMedia)?.[1] || 'N/A';
+        const maior = resumoMarkdown.match(regexMaior)?.[1] || 'N/A';
+        const menor = resumoMarkdown.match(regexMenor)?.[1] || 'N/A';
+        
+        // Extrai o texto de observações e o limpa
+        let observacoesHtml = resumoMarkdown.match(regexObservacoes)?.[1] || 'Nenhuma observação detalhada foi fornecida.';
+        
+        // Limpa o texto de observações de outros elementos Markdown ou asteriscos
+        observacoesHtml = observacoesHtml
+            .replace(/##/g, '•') 
+            .replace(/\*/g, '•')
+            .trim();
+        
+        // Remove a parte que já foi extraída do resumo original para ficar apenas o texto de observações
+        let textoRelatorioFinal = resumoMarkdown
+            .replace(/## Resumo Executivo da Turma/i, '')
+            .replace(regexMedia, '')
+            .replace(regexMaior, '')
+            .replace(regexMenor, '')
+            .replace(/O aluno com a maior pontuação e o aluno com a menor pontuação\./i, '') // Remove a linha de resumo
+            .replace(/Observações gerais sobre o desempenho da turma:\s*[\s\S]*/i, '') // Remove o bloco de observações
+            .trim();
+
+
         htmlOutput += `
             <br>
             <h3>Análise Geral de Desempenho da Turma</h3>
+            
             <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
                 <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
                     Resumo Executivo da Turma
                 </h4>
-                <div>
-                    ${resumoHtml}
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; text-align: center;">
+                    
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <small style="color: #007bff;">Média Geral da Turma</small>
+                        <h4 style="margin: 5px 0; color: #007bff;">${media} Acertos</h4>
+                    </div>
+                    
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <small style="color: #28a745;">Maior Pontuação</small>
+                        <h4 style="margin: 5px 0; color: #28a745; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${maior}">${maior}</h4>
+                    </div>
+                    
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <small style="color: #dc3545;">Menor Pontuação</small>
+                        <h4 style="margin: 5px 0; color: #dc3545; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${menor}">${menor}</h4>
+                    </div>
                 </div>
+
+                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <strong style="display: block; margin-bottom: 8px; color: #333;">Relatório de Desempenho (Observações Gerais):</strong>
+                    <div style="padding-left: 10px; border-left: 3px solid #ffc107;">
+                        ${observacoesHtml.replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+
             </div>
         `;
 
