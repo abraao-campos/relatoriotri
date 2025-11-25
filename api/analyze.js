@@ -1,8 +1,11 @@
 // Importa o SDK do Google Gen AI
 const { GoogleGenAI } = require('@google/genai');
 
-// A chave da API será lida automaticamente de GEMINI_API_KEY
-const ai = new GoogleGenAI({});
+// >> CORREÇÃO CRÍTICA: Força o SDK a ler a variável de ambiente GEMINI_API_KEY
+// O process.env.GEMINI_API_KEY lê o valor que você configurou no Vercel.
+const ai = new GoogleGenAI({ 
+    apiKey: process.env.GEMINI_API_KEY 
+});
 
 // PROMPT SIMPLIFICADO: Instruções para Contagem de Acertos/Erros
 const FIXED_PROMPT = 
