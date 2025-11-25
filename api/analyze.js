@@ -9,7 +9,7 @@ const ai = new GoogleGenAI({
     apiKey: process.env[API_KEY_NAME] 
 });
 
-// PROMPT SIMPLIFICADO: Instruções para Contagem de Acertos/Erros
+// PROMPT SIMPLIFICADO E ESTRUTURADO PARA EXTRAÇÃO FÁCIL:
 const FIXED_PROMPT = 
   `Você é um motor de análise de resultados de provas focado em precisão. Sua tarefa é comparar a Matriz de Respostas dos Alunos com o Gabarito (Gabarito) e gerar um relatório de acertos e erros para cada aluno.
 
@@ -36,10 +36,13 @@ const FIXED_PROMPT =
     - \`Percentual_Acerto\`: (Acertos / Total de Questoes * 100, formatado com uma casa decimal)
   
   --- PARTE 2: RESUMO EXECUTIVO (MARKDOWN) ---
-  O texto do resumo deve vir IMEDIATAMENTE após o bloco \`\`\`json, sem mais quebras de linha. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** e incluir:
-    - Média de Acertos da Turma.
-    - O aluno com a maior pontuação e o aluno com a menor pontuação.
-    - Observações gerais sobre o desempenho da turma (no mínimo 3 linhas).
+  O texto do resumo deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens:
+  
+  1.  **Média de Acertos**: (O valor numérico da média de acertos, SEM o símbolo de % ou o nome 'Acertos').
+  2.  **Maior Pontuação**: (O nome do aluno e seu total de acertos).
+  3.  **Menor Pontuação**: (O nome do aluno e seu total de acertos).
+
+  Após a lista, inclua uma seção **Observações Gerais:** com no mínimo 3 bullet points sobre o desempenho da turma.
 
   Abaixo, estão os dados. Seja rigoroso na separação dos dados de entrada e na comparação do gabarito.
   `;
