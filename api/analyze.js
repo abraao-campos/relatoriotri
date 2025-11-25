@@ -11,7 +11,7 @@ const FIXED_PROMPT =
   Sua tarefa primordial é **pré-processar e interpretar** os dois conjuntos de dados brutos fornecidos (Gabarito e Respostas dos Alunos), que podem estar em formatos variados (CSV, JSON, Texto Delimitado), para **garantir a consistência** antes do cálculo.
 
   ### FASE DE INTERPRETAÇÃO E NORMALIZAÇÃO DE DADOS:
-  1. **Identificação do Formato:** Determine automaticamente o separador (vírgula, ponto e vírgula, tabulação) e o tipo de codificação (se aplicável).
+  1. **Identificação do Formato:** Determine automaticamente que o separador padrão é a **vírgula (,)** e que os dados estão estruturados como tabelas.
   2. **Mapeamento de Colunas:** Para a Matriz de Respostas, identifique qual coluna representa o 'Nome do Aluno' e quais colunas representam as 'Respostas'.
   3. **Validação:** Descarte quaisquer linhas de cabeçalho ou rodapé irrelevantes.
   
@@ -52,14 +52,12 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // NOVO BLOCO: Esta estrutura é a responsável por receber os dados do app.js
     try {
         // 1. Receber os DOIS conteúdos do corpo da requisição
         const { gabaritoContent, resultadosContent, gabaritoFilename, resultadosFilename } = req.body;
 
         // VERIFICAÇÃO FINAL: Se os conteúdos vieram nulos ou vazios, retorna erro 400
         if (!gabaritoContent || !resultadosContent) {
-            // Este bloco retornará o erro que você viu se a leitura falhar
             res.status(400).json({ error: 'Os conteúdos do Gabarito e dos Resultados são obrigatórios.' });
             return;
         }
@@ -94,7 +92,8 @@ module.exports = async (req, res) => {
         console.error("Erro na análise do Gemini:", error);
         res.status(500).json({ 
             success: false, 
-            error: 'Ocorreu um erro ao processar a análise TRI. Verifique o formato dos arquivos.',
+            // Mensagem de erro mais genérica para o usuário
+            error: 'Falha na comunicação com o motor de análise TRI. O formato dos seus arquivos pode estar impedindo o processamento.',
             details: error.message
         });
     }
