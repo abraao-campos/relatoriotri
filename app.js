@@ -202,15 +202,9 @@ function formatAnalysisOutput(analysisText) {
         
         let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
         
-        // >>> REGEX ULTRA-TOLERANTE: Captura o primeiro número após a menção da métrica, ignorando *qualquer* caractere no meio.
-        
-        // Média de Acertos: Captura número inteiro ou decimal (com . ou ,)
+        // Regex Ultra-Tolerante para extração dos valores
         const regexMedia = /Média de Acertos.*?(\d+[\.,]?\d*)/is; 
-
-        // Maior Pontuação: Captura número inteiro
         const regexMaior = /Maior Pontuação.*?(\d+)/is;
-
-        // Menor Pontuação: Captura número inteiro
         const regexMenor = /Menor Pontuação.*?(\d+)/is;
         
         // Extrai os dados
@@ -219,9 +213,18 @@ function formatAnalysisOutput(analysisText) {
         const menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
         
         
+        // >> NOVA LÓGICA: Captura o total de questões do primeiro aluno, se houver
+        const totalQuestoes = relatorio_alunos.length > 0 ? relatorio_alunos[0].Total_Questoes : 'N/A';
+        
         // --- 4. Monta o HTML ---
         
-        let htmlOutput = '<h3>Relatório Detalhado por Aluno</h3><hr>';
+        let htmlOutput = `
+            <h4 style="margin-top: 5px; color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
+            </h4>
+            <h3>Relatório Detalhado por Aluno</h3>
+            <hr>
+        `;
         
         // Formata o relatório por aluno
         relatorio_alunos.forEach(aluno => {
@@ -232,7 +235,6 @@ function formatAnalysisOutput(analysisText) {
                 <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
                     <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
                     <ul style="list-style-type: none; padding: 0;">
-                        <li><strong>Total de Questões:</strong> ${aluno.Total_Questoes}</li>
                         <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
                         <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
                         <li><strong>% de Acerto:</strong> <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
