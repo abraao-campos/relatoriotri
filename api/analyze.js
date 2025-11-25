@@ -9,21 +9,15 @@ const ai = new GoogleGenAI({
     apiKey: process.env[API_KEY_NAME] 
 });
 
-// PROMPT SIMPLIFICADO E ESTRUTURADO PARA EXTRAÇÃO FÁCIL:
+// PROMPT OBRIGANDO A ESTRUTURAÇÃO DE SAÍDA EM 3 PARTES: JSON | MÉTRICAS | OBSERVAÇÕES
 const FIXED_PROMPT = 
   `Você é um motor de análise de resultados de provas focado em precisão. Sua tarefa é comparar a Matriz de Respostas dos Alunos com o Gabarito (Gabarito) e gerar um relatório de acertos e erros para cada aluno.
 
   ### DADOS DE ENTRADA:
-  Ambos os arquivos (Gabarito e Respostas) foram pré-processados e estão formatados como **Strings JSON, representando Arrays de Objetos**. Use esta estrutura de dados diretamente.
-  
-  --- FASE 1: GABARITO (JSON) ---
-  Contém a resposta correta para cada questão. A chave para a questão será o número da questão (Ex: "1", "2").
-  
-  --- FASE 2: RESPOSTAS DOS ALUNOS (JSON) ---
-  Contém as respostas de cada aluno. A chave para o nome do aluno é "Nome", e as demais chaves são os números das questões.
+  Ambos os arquivos (Gabarito e Respostas) estão formatados como Strings JSON.
   
   ### METODOLOGIA E RESULTADO:
-  O seu relatório final **DEVE** ser fornecido em duas partes distintas e obrigatórias:
+  O seu relatório final **DEVE** ser fornecido em três partes distintas, rigorosamente nesta ordem:
   
   --- PARTE 1: JSON DETALHADO POR ALUNO ---
   Forneça uma lista JSON (Array de Objetos) com os resultados de CADA aluno. Esta lista DEVE estar obrigatoriamente dentro de um bloco de código Markdown \`\`\`json.
@@ -35,14 +29,23 @@ const FIXED_PROMPT =
     - \`Erros\`: (Número de respostas incorretas ou em branco)
     - \`Percentual_Acerto\`: (Acertos / Total de Questoes * 100, formatado com uma casa decimal)
   
-  --- PARTE 2: RESUMO EXECUTIVO (MARKDOWN) ---
-  O texto do resumo deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens:
+  --- PARTE 2: MÉTRICAS (MARKDOWN) ---
+  O texto das métricas deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens formatados com negrito:
   
   1.  **Média de Acertos**: (O valor numérico da média de acertos, SEM o símbolo de % ou o nome 'Acertos').
   2.  **Maior Pontuação**: (O nome do aluno e seu total de acertos).
   3.  **Menor Pontuação**: (O nome do aluno e seu total de acertos).
-
-  Após a lista, inclua uma seção **Observações Gerais:** com no mínimo 3 bullet points sobre o desempenho da turma.
+  
+  --- PARTE 3: OBSERVAÇÕES GERAIS (BLOCO DE CÓDIGO) ---
+  Forneça a análise em texto corrido (em parágrafos ou com bullet points) logo após a lista de métricas, dentro de um bloco de código Markdown **\`\`\`text** com o título **Observações Gerais:**.
+  
+  Exemplo de formato esperado para a PARTE 3:
+  \`\`\`text
+  Observações Gerais:
+  O desempenho da turma foi mediano, com a maioria dos alunos concentrada entre 60% e 75% de acerto.
+  - A maior dificuldade foi na Competência 5, Habilidade 23 (Direitos e Deveres).
+  - A Competência 1 foi a área de maior acerto.
+  \`\`\`
 
   Abaixo, estão os dados. Seja rigoroso na separação dos dados de entrada e na comparação do gabarito.
   `;
