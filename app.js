@@ -1,51 +1,65 @@
 // URL da sua função serverless.
-// Se você usar Vercel ou Netlify, o caminho será /api/analyze
 const BACKEND_URL = '/api/analyze'; 
 
-document.getElementById('analiseForm').addEventListener('submit', function(e) {
-    e.preventDefault(); // Impede o envio tradicional do formulário
+// Função auxiliar para ler um arquivo como texto, retornando uma Promise
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(file);
+    });
+}
+
+document.getElementById('analiseForm').addEventListener('submit', async function(e) {
+    e.preventDefault(); 
     
-    const arquivoInput = document.getElementById('arquivoResultados');
+    const gabaritoInput = document.getElementById('arquivoGabarito');
+    const resultadosInput = document.getElementById('arquivoResultados');
     const statusDiv = document.getElementById('status');
     const resultadoTexto = document.getElementById('resultadoTexto');
+    const botao = document.getElementById('botaoAnalisar');
 
-    // 1. Verificação básica do arquivo
-    if (arquivoInput.files.length === 0) {
-        alert("Por favor, selecione um arquivo.");
+    // Verificação básica dos arquivos
+    if (gabaritoInput.files.length === 0 || resultadosInput.files.length === 0) {
+        alert("Por favor, selecione ambos os arquivos: Gabarito e Resultados.");
         return;
     }
 
-    const arquivo = arquivoInput.files[0];
-    const reader = new FileReader();
+    // Preparar o estado da interface
+    botao.disabled = true;
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Lendo arquivos no seu navegador...';
+    statusDiv.classList.add('loading');
+    resultadoTexto.textContent = 'A análise está sendo processada pelo Gemini. Por favor, aguarde...';
 
-    // Quando o arquivo é lido com sucesso, ele prepara e envia os dados
-    reader.onload = function(event) {
-        const fileContent = event.target.result;
-        
+    const arquivoGabarito = gabaritoInput.files[0];
+    const arquivoResultados = resultadosInput.files[0];
+
+    try {
+        // Leitura de ambos os arquivos de forma paralela
+        const [contentGabarito, contentResultados] = await Promise.all([
+            readFileAsText(arquivoGabarito),
+            readFileAsText(arquivoResultados)
+        ]);
+
         // Dados a serem enviados para o backend
         const dadosParaEnvio = {
-            content: fileContent, // O conteúdo completo do arquivo (string)
-            filename: arquivo.name,
-            filetype: arquivo.type
+            gabaritoContent: contentGabarito,
+            resultadosContent: contentResultados,
+            gabaritoFilename: arquivoGabarito.name,
+            resultadosFilename: arquivoResultados.name
         };
 
         // Envia os dados para o backend
-        sendToBackend(dadosParaEnvio);
-    };
+        await sendToBackend(dadosParaEnvio);
 
-    // Função para tratar erros de leitura
-    reader.onerror = function(event) {
-        statusDiv.innerHTML = `❌ Erro ao ler o arquivo: ${event.target.error.name}`;
-        statusDiv.style.display = 'block';
-    };
+    } catch (error) {
+        // Erro de leitura de arquivo (local)
+        statusDiv.innerHTML = `❌ Erro ao ler um dos arquivos: ${error.message}`;
+        botao.disabled = false;
 
-    // 2. Lê o arquivo como texto (para CSV, JSON, TXT)
-    reader.readAsText(arquivo);
-
-    // Indicador de Carregamento (início do processo de leitura)
-    statusDiv.innerHTML = '⏳ Lendo e enviando arquivo para análise...';
-    statusDiv.style.display = 'block';
-    resultadoTexto.textContent = 'A análise está sendo processada pelo Gemini. Por favor, aguarde...';
+    }
 });
 
 
@@ -55,17 +69,14 @@ async function sendToBackend(data) {
     const botao = document.getElementById('botaoAnalisar');
     const resultadoTexto = document.getElementById('resultadoTexto');
 
-    // Desabilitar o botão e mostrar status de carregamento
-    botao.disabled = true;
     statusDiv.innerHTML = '🚀 Enviando dados e aguardando resposta do Gemini...';
-    statusDiv.classList.add('loading');
     
     try {
-        // 3. Faz a requisição HTTP POST para a função serverless
         const response = await fetch(BACKEND_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                // REFORÇO: Garante que o JSON e a codificação UTF-8 sejam reconhecidos
+                'Content-Type': 'application/json; charset=utf-8' 
             },
             body: JSON.stringify(data)
         });
@@ -74,11 +85,11 @@ async function sendToBackend(data) {
 
         if (result.success) {
             // Sucesso na análise
-            statusDiv.innerHTML = `✅ Análise concluída para o arquivo: ${result.filename}!`;
+            statusDiv.innerHTML = `✅ Análise concluída para os arquivos!`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = result.analysis;
         } else {
-            // Erro retornado pelo backend
+            // Erro retornado pelo backend (Inclui o erro de "conteúdos obrigatórios")
             statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = `Não foi possível obter a análise. Detalhes: ${result.error}`;
