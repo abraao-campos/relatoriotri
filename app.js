@@ -3,11 +3,17 @@ const BACKEND_URL = '/api/analyze';
 
 // FUNÇÃO CHAVE: Converte o texto CSV bruto em um Array de Objetos JSON
 function csvToJson(csvContent) {
-    if (!csvContent) return [];
+    if (!csvContent) return "[]";
     
-    // Divide o conteúdo em linhas
+    // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
     const lines = csvContent.split('\n').filter(line => line.trim() !== '');
 
+    // >> NOVO TRATAMENTO DE ERRO AQUI: Se não houver linhas, retorna um JSON vazio.
+    if (lines.length === 0) {
+        console.error("CSV vazio após filtragem de linhas. O arquivo pode estar vazio ou a codificação está incorreta.");
+        return "[]"; 
+    }
+    
     // Detecta o separador: tenta ponto-e-vírgula ou vírgula
     let separator = lines[0].includes(';') ? ';' : ',';
     
@@ -22,8 +28,8 @@ function csvToJson(csvContent) {
         if (!currentLine) continue;
 
         const values = currentLine.split(separator).map(value => value.trim());
+        // Garante que o número de colunas bate com o cabeçalho
         if (values.length !== headers.length) {
-            // Se o número de colunas for inconsistente, ignora ou alerta
             console.warn(`Linha ignorada devido a colunas inconsistentes: ${currentLine}`);
             continue;
         }
@@ -89,8 +95,9 @@ document.getElementById('analiseForm').addEventListener('submit', async function
         const jsonGabarito = csvToJson(rawGabarito);
         const jsonResultados = csvToJson(rawResultados);
 
-        if (jsonGabarito.length < 5 || jsonResultados.length < 5) {
-             alert("A conversão JSON falhou ou resultou em dados vazios. Verifique o formato do seu CSV (separadores, cabeçalho).");
+        // Verifica se a conversão resultou em JSON vazio
+        if (jsonGabarito === "[]" || jsonResultados === "[]") {
+             alert("A conversão JSON falhou. Verifique se seus arquivos CSV não estão vazios e se a codificação é UTF-8.");
              botao.disabled = false;
              return;
         }
