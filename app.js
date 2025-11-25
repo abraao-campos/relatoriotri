@@ -5,22 +5,22 @@ const BACKEND_URL = '/api/analyze';
 function csvToJson(csvContent) {
     if (!csvContent) return "[]";
     
-    // >> SOLUÇÃO FINAL DE ROBUSTEZ: LIMPEZA AGRESSIVA E NORMALIZAÇÃO
+    // Solução de Robustez: Limpeza e Normalização de Quebra de Linha
     let normalizedContent = csvContent
-        .replace(/\r\n/g, '\n') // 1. Trata Windows CRLF
-        .replace(/\r/g, '\n')   // 2. Trata Mac antigo CR
-        .replace(/[\u200B-\u200D\uFEFF]/g, ''); // 3. Remove BOM e caracteres invisíveis (zero-width spaces)
+        .replace(/\r\n/g, '\n') // Trata Windows CRLF
+        .replace(/\r/g, '\n')   // Trata Mac antigo CR
+        .replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove BOM e caracteres invisíveis
 
     // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
     const lines = normalizedContent.split('\n').filter(line => line.trim() !== '');
 
-    // Se não houver linhas, retorna um JSON vazio.
+    // Se não houver linhas após a limpeza
     if (lines.length === 0) {
-        console.error("CSV vazio após filtragem de linhas. O arquivo pode estar vazio ou a codificação está incorreta.");
+        console.error("CSV vazio após filtragem de linhas.");
         return "[]"; 
     }
     
-    // Detecta o separador: tenta ponto-e-vírgula ou vírgula
+    // Detecta o separador: tenta ponto-e-vírgula ou vírgula (padrão internacional)
     let separator = lines[0].includes(';') ? ';' : ',';
     
     // Obtém e limpa os cabeçalhos (primeira linha)
@@ -103,14 +103,13 @@ document.getElementById('analiseForm').addEventListener('submit', async function
 
         // Verifica se a conversão resultou em JSON vazio
         if (jsonGabarito === "[]" || jsonResultados === "[]") {
-             alert("A conversão JSON falhou. Seus arquivos CSV podem estar vazios ou o formato de codificação é incompatível.");
+             alert("A conversão JSON falhou. Seus arquivos podem estar vazios ou o formato de codificação é incompatível.");
              botao.disabled = false;
              return;
         }
 
         // Dados a serem enviados para o backend
         const dadosParaEnvio = {
-            // ENVIAMOS AGORA A STRING JSON, NÃO MAIS O TEXTO BRUTO
             gabaritoContent: jsonGabarito, 
             resultadosContent: jsonResultados,
             gabaritoFilename: arquivoGabarito.name,
@@ -141,7 +140,6 @@ async function sendToBackend(data) {
         const response = await fetch(BACKEND_URL, {
             method: 'POST',
             headers: {
-                // REFORÇO: Garante que o JSON e a codificação UTF-8 sejam reconhecidos
                 'Content-Type': 'application/json; charset=utf-8' 
             },
             body: JSON.stringify(data)
@@ -151,7 +149,7 @@ async function sendToBackend(data) {
 
         if (result.success) {
             // Sucesso na análise
-            statusDiv.innerHTML = `✅ Análise concluída para os arquivos!`;
+            statusDiv.innerHTML = `✅ Análise concluída!`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = result.analysis;
         } else {
