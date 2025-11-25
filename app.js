@@ -177,36 +177,49 @@ async function sendToBackend(data) {
 // >> NOVA FUNÇÃO: Transforma a resposta do Gemini em HTML formatado
 function formatAnalysisOutput(analysisText) {
     try {
-        // 1. Encontra e extrai o bloco JSON (o array de alunos)
+        // 1. Encontra e extrai o bloco JSON de ALUNOS
         const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
         
         if (!jsonMatch) {
-            // Se o JSON não for encontrado, retorna o texto bruto do Gemini
-            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado. Verifique o texto bruto:</p><pre>' + analysisText + '</pre>';
+            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado.</p><pre>' + analysisText + '</pre>';
         }
         
         const jsonString = jsonMatch[1];
-        // Parseia a lista de alunos (Array) diretamente
         const relatorio_alunos = JSON.parse(jsonString); 
         
-        // 2. Extrai TUDO o que vem depois do bloco de código JSON (o resumo em Markdown)
-        const jsonBlockEndIndex = jsonMatch.index + jsonMatch[0].length;
-        let resumoMarkdown = analysisText.substring(jsonBlockEndIndex).trim();
+        // 2. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (Novo e mais robusto)
+        const obsMatch = analysisText.match(/```text\s*Observações Gerais:([\s\S]*?)\n```/i);
+        let observacoesTexto = 'Nenhuma observação detalhada foi fornecida.';
         
-        // Remove quaisquer quebras de linha ou espaços remanescentes antes do título.
-        resumoMarkdown = resumoMarkdown.replace(/^[\s\r\n]+/g, '');
-
-        // Fallback: se o resumo estiver vazio após a extração.
-        if (resumoMarkdown.length < 10) {
-             resumoMarkdown = '## Resumo Executivo da Turma\n\nNenhuma análise geral foi fornecida pelo Gemini (Resposta muito curta).';
+        if (obsMatch && obsMatch[1]) {
+            // Se o bloco '```text' for encontrado, pegamos seu conteúdo.
+            observacoesTexto = obsMatch[1].trim();
         }
+        
+        // 3. Extrai o texto da seção de MÉTRICAS (entre o JSON de alunos e o bloco de observações)
+        const jsonBlockEndIndex = jsonMatch.index + jsonMatch[0].length;
+        const obsBlockStartIndex = obsMatch ? obsMatch.index : analysisText.length;
+        
+        let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
+        
+        // Regex mais simples para extrair os valores-chave do texto Markdown das Métricas
+        const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+)/i;
+        const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*([^.]+)/i;
+        const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*([^.]+)/i;
+        
+        // Extrai os dados
+        const media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
+        const maior = metricasMarkdown.match(regexMaior)?.[1] || 'N/A';
+        const menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
+        
+        
+        // --- 4. Monta o HTML ---
         
         let htmlOutput = '<h3>Relatório Detalhado por Aluno</h3><hr>';
         
-        // 3. Formata o relatório por aluno
+        // Formata o relatório por aluno
         relatorio_alunos.forEach(aluno => {
             const percent = parseFloat(aluno.Percentual_Acerto);
-            // Escolhe a cor com base no desempenho
             const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
 
             htmlOutput += `
@@ -222,29 +235,8 @@ function formatAnalysisOutput(analysisText) {
             `;
         });
         
-        // >> MELHORIA DE LAYOUT DO RESUMO EXECUTIVO COM CARDS VERTICAIS <<
-        
-        // Expressões Regulares (usadas na etapa anterior e corrigidas)
-        const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+)/i;
-        const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*([^.]+)/i;
-        const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*([^.]+)/i;
-        
-        // Extrai os dados
-        const media = resumoMarkdown.match(regexMedia)?.[1] || 'N/A';
-        const maior = resumoMarkdown.match(regexMaior)?.[1] || 'N/A';
-        const menor = resumoMarkdown.match(regexMenor)?.[1] || 'N/A';
-        
-        // Remove as linhas de métricas e o título para ISOLAR o texto de observações
-        let observacoesHtml = resumoMarkdown
-            .replace(/## Resumo Executivo da Turma/i, '')
-            .replace(regexMedia, '')
-            .replace(regexMaior, '')
-            .replace(regexMenor, '')
-            .replace(/Observações Gerais:/i, '')
-            .trim();
-        
-        // Limpa o texto de observações e converte para HTML
-        observacoesHtml = observacoesHtml
+        // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
+        let observacoesHtml = observacoesTexto
             .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
             .replace(/\*/g, '•') // Converte * em •
             .replace(/\n/g, '<br>') // Converte \n em <br>
@@ -279,7 +271,7 @@ function formatAnalysisOutput(analysisText) {
                 </div>
 
                 <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho:</strong>
+                    <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
                     <div style="padding-left: 5px; color: #555;">
                         ${observacoesHtml}
                     </div>
@@ -291,8 +283,7 @@ function formatAnalysisOutput(analysisText) {
         return htmlOutput;
 
     } catch (e) {
-        // Se houver erro na formatação (JSON mal formado), retorna o texto bruto com erro
         console.error("Erro na Formatação do JSON:", e);
-        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. Verifique se o Gemini retornou os dados no formato esperado. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
+        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
     }
 }
