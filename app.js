@@ -222,9 +222,9 @@ function formatAnalysisOutput(analysisText) {
             `;
         });
         
-        // >> CORREÇÃO ROBUSTA DE EXTRAÇÃO E LAYOUT DO RESUMO EXECUTIVO <<
+        // >> MELHORIA DE LAYOUT DO RESUMO EXECUTIVO COM CARDS VERTICAIS <<
         
-        // Expressões Regulares mais simples (graças ao novo prompt)
+        // Expressões Regulares (usadas na etapa anterior e corrigidas)
         const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+)/i;
         const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*([^.]+)/i;
         const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*([^.]+)/i;
@@ -234,7 +234,7 @@ function formatAnalysisOutput(analysisText) {
         const maior = resumoMarkdown.match(regexMaior)?.[1] || 'N/A';
         const menor = resumoMarkdown.match(regexMenor)?.[1] || 'N/A';
         
-        // Remove as linhas de métricas já extraídas e o título para isolar o texto do relatório
+        // Remove as linhas de métricas e o título para ISOLAR o texto de observações
         let observacoesHtml = resumoMarkdown
             .replace(/## Resumo Executivo da Turma/i, '')
             .replace(regexMedia, '')
@@ -243,7 +243,7 @@ function formatAnalysisOutput(analysisText) {
             .replace(/Observações Gerais:/i, '')
             .trim();
         
-        // Limpa o texto de observações e converte para HTML (listas)
+        // Limpa o texto de observações e converte para HTML
         observacoesHtml = observacoesHtml
             .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
             .replace(/\*/g, '•') // Converte * em •
@@ -260,27 +260,27 @@ function formatAnalysisOutput(analysisText) {
                     Resumo Executivo da Turma
                 </h4>
                 
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; text-align: center;">
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                     
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                        <small style="color: #007bff; font-weight: bold;">Média de Acertos</small>
-                        <h4 style="margin: 5px 0; color: #007bff;">${media} Acertos</h4>
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #007bff;">Média de Acertos</strong>
+                        <h4 style="margin: 0; color: #007bff;">${media} Acertos</h4>
                     </div>
                     
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                        <small style="color: #28a745; font-weight: bold;">Maior Pontuação</small>
-                        <h4 style="margin: 5px 0; color: #28a745; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${maior}">${maior}</h4>
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #28a745;">Maior Pontuação</strong>
+                        <h4 style="margin: 0; color: #28a745;">${maior}</h4>
                     </div>
                     
-                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                        <small style="color: #dc3545; font-weight: bold;">Menor Pontuação</small>
-                        <h4 style="margin: 5px 0; color: #dc3545; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${menor}">${menor}</h4>
+                    <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #dc3545;">Menor Pontuação</strong>
+                        <h4 style="margin: 0; color: #dc3545;">${menor}</h4>
                     </div>
                 </div>
 
                 <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <strong style="display: block; margin-bottom: 8px; color: #333;">Relatório de Desempenho (Observações Gerais):</strong>
-                    <div style="padding-left: 10px; border-left: 3px solid #ffc107;">
+                    <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho:</strong>
+                    <div style="padding-left: 5px; color: #555;">
                         ${observacoesHtml}
                     </div>
                 </div>
