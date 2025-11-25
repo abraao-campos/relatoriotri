@@ -9,7 +9,7 @@ const ai = new GoogleGenAI({
     apiKey: process.env[API_KEY_NAME] 
 });
 
-// PROMPT OBRIGANDO A ESTRUTURAÇÃO DE SAÍDA EM 3 PARTES: JSON | MÉTRICAS | OBSERVAÇÕES
+// PROMPT OBRIGANDO A ESTRUTURAÇÃO DE SAÍDA EM 3 PARTES: JSON | MÉTRICAS SIMPLIFICADAS | OBSERVAÇÕES
 const FIXED_PROMPT = 
   `Você é um motor de análise de resultados de provas focado em precisão. Sua tarefa é comparar a Matriz de Respostas dos Alunos com o Gabarito (Gabarito) e gerar um relatório de acertos e erros para cada aluno.
 
@@ -29,22 +29,27 @@ const FIXED_PROMPT =
     - \`Erros\`: (Número de respostas incorretas ou em branco)
     - \`Percentual_Acerto\`: (Acertos / Total de Questoes * 100, formatado com uma casa decimal)
   
-  --- PARTE 2: MÉTRICAS (MARKDOWN) ---
-  O texto das métricas deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens formatados com negrito:
+  --- PARTE 2: MÉTRICAS SIMPLIFICADAS (MARKDOWN) ---
+  O texto das métricas deve vir IMEDIATAMENTE após o bloco \`\`\`json. Ele deve OBRIGATORIAMENTE começar com o título **## Resumo Executivo da Turma** seguido de UMA LISTA SIMPLES em Markdown com TRÊS itens formatados com negrito, contendo APENAS o número ou a contagem de acertos:
   
-  1.  **Média de Acertos**: (O valor numérico da média de acertos, SEM o símbolo de % ou o nome 'Acertos').
-  2.  **Maior Pontuação**: (O nome do aluno e seu total de acertos).
-  3.  **Menor Pontuação**: (O nome do aluno e seu total de acertos).
+  1.  **Média de Acertos**: (O valor numérico da média de acertos, SEM o símbolo de % ou o nome 'Acertos'. Ex: 25)
+  2.  **Maior Pontuação**: (A maior pontuação alcançada, APENAS o número. Ex: 40)
+  3.  **Menor Pontuação**: (A menor pontuação alcançada, APENAS o número. Ex: 15)
   
   --- PARTE 3: OBSERVAÇÕES GERAIS (BLOCO DE CÓDIGO) ---
   Forneça a análise em texto corrido (em parágrafos ou com bullet points) logo após a lista de métricas, dentro de um bloco de código Markdown **\`\`\`text** com o título **Observações Gerais:**.
   
+  Este bloco DEVE incluir:
+  - O nome dos alunos que alcançaram a maior pontuação.
+  - O nome dos alunos que alcançaram a menor pontuação.
+  - Análise detalhada das áreas de acerto e dificuldade.
+
   Exemplo de formato esperado para a PARTE 3:
   \`\`\`text
   Observações Gerais:
-  O desempenho da turma foi mediano, com a maioria dos alunos concentrada entre 60% e 75% de acerto.
+  A maior pontuação (40 acertos) foi alcançada pelo(a) aluno(a) Bruno Santos. A menor pontuação (15 acertos) foi do(a) aluno(a) Mário Dantas.
+  - O desempenho da turma foi mediano, com a maioria dos alunos concentrada entre 60% e 75% de acerto.
   - A maior dificuldade foi na Competência 5, Habilidade 23 (Direitos e Deveres).
-  - A Competência 1 foi a área de maior acerto.
   \`\`\`
 
   Abaixo, estão os dados. Seja rigoroso na separação dos dados de entrada e na comparação do gabarito.
