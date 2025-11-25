@@ -35,41 +35,68 @@
             font-size: 1.1em;
         }
 
-        /* Estilos dos Novos Blocos Explicativos */
-        .info-block {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        }
-
-        .gabarito-block {
+        /* Novo Bloco Único de Instruções */
+        .upload-info-block {
             background-color: #e6f7ff; /* Azul claro */
             border: 1px solid #91d5ff;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
 
-        .resultados-block {
-            background-color: #fffbe6; /* Amarelo claro */
-            border: 1px solid #ffe58f;
-        }
-
-        .info-block h3 {
+        .upload-info-block h3 {
+            color: #007bff;
             margin-top: 0;
-            font-size: 1.25em;
+            display: flex;
+            align-items: center;
+            font-size: 1.4em;
+            margin-bottom: 15px;
         }
 
-        .info-block pre {
-            background-color: rgba(0, 0, 0, 0.05);
-            padding: 10px;
+        .upload-info-block h3 span {
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+
+        .upload-info-block strong {
+            color: #007bff;
+        }
+
+        .upload-info-block ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .upload-info-block li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .upload-info-block li::before {
+            content: '•';
+            color: #007bff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+        }
+
+        .upload-info-block pre {
+            background-color: #f0f8ff;
+            border-left: 3px solid #007bff;
+            padding: 10px 15px;
             border-radius: 4px;
             overflow-x: auto;
             font-size: 0.9em;
             color: #333;
+            margin-top: 15px;
         }
 
         /* Estilos do Formulário */
         .form-group {
-            margin-bottom: 15px;
+            margin-top: 20px;
         }
 
         label {
@@ -81,30 +108,31 @@
         input[type="file"] {
             display: block;
             width: 100%;
-            padding: 8px;
+            padding: 10px;
             margin-top: 5px;
-            border: 1px solid #ced4da;
+            border: 2px dashed #007bff;
             border-radius: 4px;
-            background-color: #fff;
+            background-color: #ffffff;
         }
 
         button {
-            background-color: #007bff;
+            background-color: #28a745;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 25px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            font-size: 1.1em;
+            font-size: 1.2em;
             transition: background-color 0.3s;
+            margin-top: 20px;
         }
 
         button:hover:not(:disabled) {
-            background-color: #0056b3;
+            background-color: #1e7e34;
         }
 
         button:disabled {
-            background-color: #a0c3e8;
+            background-color: #8ac19c;
             cursor: not-allowed;
         }
 
@@ -146,51 +174,34 @@
 
     <form id="analiseForm">
         
-        <div class="info-block gabarito-block">
-            <h3>1. 📘 Selecione o Arquivo do Gabarito Oficial (.csv)</h3>
-            <p>O arquivo CSV do gabarito **DEVE** ter apenas **duas colunas** (separadas por ponto e vírgula `;` ou vírgula `,`).</p>
-            <ul>
-                <li>A primeira coluna deve conter o número ou nome da **Questão**.</li>
-                <li>A segunda coluna deve conter a **Resposta** correta.</li>
-            </ul>
-            <p><strong>Exemplo de Estrutura:</strong></p>
-            <pre>Questão;Resposta
-1;A
-2;C
-3;E
-...</pre>
+        <div class="upload-info-block">
+            <h3><span>📁</span> Envio Único: Arquivo de Gabarito e Resultados (.csv)</h3>
+            <p>O arquivo CSV de resultados deve conter **todas as informações de correção** em um único local, utilizando ponto e vírgula (`;`) ou vírgula (`,`) como separador.</p>
             
-            <div class="form-group">
-                <label for="arquivoGabarito">Arquivo do Gabarito:</label>
-                <input type="file" id="arquivoGabarito" accept=".csv" required>
-            </div>
-        </div>
-        
-        <div class="info-block resultados-block">
-            <h3>2. 📝 Selecione o Arquivo de Resultados da Turma (.csv)</h3>
-            <p>O arquivo CSV de resultados **DEVE** ter o nome do aluno na primeira coluna, seguido pelas respostas de cada questão. A **primeira linha deve ser o Gabarito Oficial** para garantir a leitura correta.</p>
             <ul>
-                <li>A primeira coluna deve conter o **Nome dos Alunos** (e a linha "Gabarito Oficial").</li>
-                <li>As colunas seguintes devem ser as respostas dos alunos (e do Gabarito Oficial) na ordem correta da prova (Ex: 1, 2, 3...).</li>
+                <li>A **primeira linha de dados** deve ser o **Gabarito Oficial**. O nome da primeira coluna (Aluno) deve ser "Gabarito Oficial" (ou similar).</li>
+                <li>As linhas seguintes devem ser as marcações dos **alunos** que serão corrigidos.</li>
+                <li>As colunas (a partir da segunda) devem ser as respostas das questões na ordem correta da prova (Ex: 1, 2, 3...).</li>
             </ul>
-            <p><strong>Exemplo de Estrutura:</strong></p>
+            
+            <p><strong>Exemplo de Estrutura Ideal:</strong></p>
             <pre>Nome;1;2;3;4;5;...
 Gabarito Oficial;A;C;E;B;D;...
 Aluno A;A;D;E;B;D;...
 Aluno B;A;C;A;B;C;...</pre>
 
             <div class="form-group">
-                <label for="arquivoResultados">Arquivo de Resultados:</label>
+                <label for="arquivoResultados">Selecione o arquivo CSV de Resultados (com o Gabarito na primeira linha):</label>
                 <input type="file" id="arquivoResultados" accept=".csv" required>
             </div>
         </div>
-
-        <button type="submit" id="botaoAnalisar">Analisar Resultados com Gemini</button>
+        
+        <button type="submit" id="botaoAnalisar">✅ Analisar Resultados com Gemini</button>
         <div id="status"></div>
     </form>
 
     <div id="resultadoTexto">
-        <p>Após enviar os arquivos, o relatório de desempenho aparecerá nesta área.</p>
+        <p>Após enviar o arquivo, o relatório de desempenho completo aparecerá nesta área.</p>
     </div>
 </div>
 
