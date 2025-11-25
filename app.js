@@ -56,9 +56,22 @@ document.getElementById('analiseForm').addEventListener('submit', async function
     
     const gabaritoInput = document.getElementById('arquivoGabarito');
     const resultadosInput = document.getElementById('arquivoResultados');
-    // ... (restante das variáveis)
+    const statusDiv = document.getElementById('status');
+    const resultadoTexto = document.getElementById('resultadoTexto');
+    const botao = document.getElementById('botaoAnalisar');
 
-    // ... (verificações iniciais e status updates)
+    // Verificação básica dos arquivos
+    if (gabaritoInput.files.length === 0 || resultadosInput.files.length === 0) {
+        alert("Por favor, selecione ambos os arquivos: Gabarito e Resultados.");
+        return;
+    }
+
+    // Preparar o estado da interface
+    botao.disabled = true;
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Lendo arquivos no seu navegador...';
+    statusDiv.classList.add('loading');
+    resultadoTexto.textContent = 'A análise está sendo processada pelo Gemini. Por favor, aguarde...';
 
     const arquivoGabarito = gabaritoInput.files[0];
     const arquivoResultados = resultadosInput.files[0];
@@ -95,16 +108,16 @@ document.getElementById('analiseForm').addEventListener('submit', async function
         await sendToBackend(dadosParaEnvio);
 
     } catch (error) {
-        // ... (erro de leitura de arquivo)
+        // Erro de leitura de arquivo (local)
+        statusDiv.innerHTML = `❌ Erro ao ler um dos arquivos: ${error.message}`;
+        botao.disabled = false;
+
     }
 });
 
 
-// Função responsável pela comunicação com o Backend Serverless (Sem Alterações)
+// Função responsável pela comunicação com o Backend Serverless
 async function sendToBackend(data) {
-    // ... (código da função sendToBackend permanece o mesmo) ...
-    // É crucial que headers: {'Content-Type': 'application/json; charset=utf-8'} permaneça.
-    // ...
     const statusDiv = document.getElementById('status');
     const botao = document.getElementById('botaoAnalisar');
     const resultadoTexto = document.getElementById('resultadoTexto');
@@ -115,6 +128,7 @@ async function sendToBackend(data) {
         const response = await fetch(BACKEND_URL, {
             method: 'POST',
             headers: {
+                // REFORÇO: Garante que o JSON e a codificação UTF-8 sejam reconhecidos
                 'Content-Type': 'application/json; charset=utf-8' 
             },
             body: JSON.stringify(data)
@@ -123,21 +137,25 @@ async function sendToBackend(data) {
         const result = await response.json();
 
         if (result.success) {
+            // Sucesso na análise
             statusDiv.innerHTML = `✅ Análise concluída para os arquivos!`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = result.analysis;
         } else {
+            // Erro retornado pelo backend
             statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
             statusDiv.classList.remove('loading');
             resultadoTexto.textContent = `Não foi possível obter a análise. Detalhes: ${result.error}`;
         }
 
     } catch (error) {
+        // Erro de rede ou comunicação
         statusDiv.innerHTML = '❌ Erro de conexão com o servidor de análise.';
         statusDiv.classList.remove('loading');
         resultadoTexto.textContent = `Erro de rede: ${error.message}`;
 
     } finally {
+        // Reabilitar o botão
         botao.disabled = false;
     }
 }
