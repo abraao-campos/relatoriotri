@@ -103,7 +103,7 @@ document.getElementById('analiseForm').addEventListener('submit', async function
 
         // Verifica se a conversão resultou em JSON vazio
         if (jsonGabarito === "[]" || jsonResultados === "[]") {
-             alert("A conversão JSON falhou. Seus arquivos podem estar vazios ou o formato de codificação é incompatível.");
+             alert("A conversão JSON falhou. Seus arquivos CSV podem estar vazios ou o formato de codificação é incompatível.");
              botao.disabled = false;
              return;
         }
@@ -148,10 +148,12 @@ async function sendToBackend(data) {
         const result = await response.json();
 
         if (result.success) {
-            // Sucesso na análise
             statusDiv.innerHTML = `✅ Análise concluída!`;
             statusDiv.classList.remove('loading');
-            resultadoTexto.textContent = result.analysis;
+            
+            // >> NOVO PASSO: Formatação do Resultado (Chamada à nova função)
+            resultadoTexto.innerHTML = formatAnalysisOutput(result.analysis);
+            
         } else {
             // Erro retornado pelo backend
             statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
@@ -168,5 +170,62 @@ async function sendToBackend(data) {
     } finally {
         // Reabilitar o botão
         botao.disabled = false;
+    }
+}
+
+
+// >> NOVA FUNÇÃO: Transforma a resposta do Gemini em HTML formatado
+function formatAnalysisOutput(analysisText) {
+    try {
+        // 1. Encontra e extrai o bloco JSON (relatorio_alunos_json)
+        const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
+        
+        if (!jsonMatch) {
+            // Se o JSON não for encontrado, retorna o texto bruto do Gemini
+            return '<h3>Relatório Completo</h3>' + analysisText.replace(/\n/g, '<br>');
+        }
+        
+        const jsonString = jsonMatch[1];
+        const report = JSON.parse(jsonString);
+        
+        // 2. Encontra e extrai o resumo em Markdown (resumo_executivo_markdown)
+        const markdownMatch = analysisText.match(/## Resumo Executivo\s+([\s\S]*)/i);
+        const resumoMarkdown = markdownMatch ? markdownMatch[0] : '## Resumo Executivo (Não encontrado)';
+        
+        let htmlOutput = '<h3>Relatório Detalhado por Aluno</h3><hr>';
+        
+        // 3. Formata o relatório por aluno
+        report.relatorio_alunos_json.forEach(aluno => {
+            const percent = parseFloat(aluno.Percentual_Acerto);
+            // Escolhe a cor com base no desempenho
+            const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
+
+            htmlOutput += `
+                <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
+                    <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
+                    <ul style="list-style-type: none; padding: 0;">
+                        <li><strong>Total de Questões:</strong> ${aluno.Total_Questoes}</li>
+                        <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
+                        <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
+                        <li><strong>% de Acerto:</strong> <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
+                    </ul>
+                </div>
+            `;
+        });
+        
+        // 4. Converte o Resumo Markdown em HTML simples (pode ser melhorado com bibliotecas, mas isso funciona para o básico)
+        const resumoHtml = resumoMarkdown
+            .replace(/##/g, '<h4>') // Títulos
+            .replace(/\*/g, '•') // Listas
+            .replace(/\n/g, '<br>'); // Quebra de linha
+            
+        htmlOutput += `<br><h3>Análise Geral de Desempenho da Turma</h3><hr><div>${resumoHtml}</div>`;
+
+        return htmlOutput;
+
+    } catch (e) {
+        // Se houver erro na formatação (JSON mal formado), retorna o texto bruto com erro
+        console.error("Erro na Formatação do JSON:", e);
+        return '<h3>Erro ao processar o JSON de Resultados</h3><p>O Gemini pode ter retornado um JSON inválido. Verifique o texto bruto abaixo:</p><pre>' + analysisText + '</pre>';
     }
 }
