@@ -80,9 +80,12 @@ document.getElementById('analiseForm').addEventListener('submit', async function
     // Preparar o estado da interface
     botao.disabled = true;
     statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '⏳ Lendo arquivo no seu navegador...';
+    
+    // >> NOVO TEXTO CURTO E OBJETIVO
+    statusDiv.innerHTML = '⏳ Preparando dados...';
+    
     statusDiv.classList.add('loading');
-    resultadoTexto.textContent = 'A análise está sendo processada pelo Gemini. Por favor, aguarde...';
+    resultadoTexto.textContent = 'Aguarde o processamento...';
 
     const arquivoResultados = resultadosInput.files[0];
 
@@ -91,7 +94,7 @@ document.getElementById('analiseForm').addEventListener('submit', async function
         const rawResultados = await readFileAsText(arquivoResultados);
         
         // CONVERTER RAW TEXT (CSV) PARA JSON STRING
-        statusDiv.innerHTML = '✨ Pré-processando dados no navegador...';
+        statusDiv.innerHTML = '✨ Lendo e convertendo o arquivo...';
 
         const jsonResultados = csvToJson(rawResultados);
 
@@ -126,7 +129,8 @@ async function sendToBackend(data) {
     const botao = document.getElementById('botaoAnalisar');
     const resultadoTexto = document.getElementById('resultadoTexto');
 
-    statusDiv.innerHTML = '🚀 Enviando dados e aguardando resposta do Gemini...';
+    // >> NOVO TEXTO SIMPLIFICADO DURANTE A COMUNICAÇÃO COM O SERVIDOR
+    statusDiv.innerHTML = '🤖 Analisando...'; 
     
     try {
         const response = await fetch(BACKEND_URL, {
@@ -248,7 +252,7 @@ function formatAnalysisOutput(analysisText) {
 }
 
 
-// >> NOVA FUNÇÃO: Monta o HTML, separada para organização
+// >> FUNÇÃO: Monta o HTML
 function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto, analysisText }) {
     
     // Processamento do texto de observações se vier da extração do Gemini
