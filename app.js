@@ -187,8 +187,7 @@ function formatAnalysisOutput(analysisText) {
         const jsonString = jsonMatch[1];
         const relatorio_alunos = JSON.parse(jsonString); 
         
-        // 2. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (Novo e mais robusto)
-        // O bloco começa com ```text e termina com ```
+        // 2. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (robusto contra formatação ```text)
         const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
         let observacoesTexto = 'Nenhuma observação detalhada foi fornecida.';
         
@@ -203,11 +202,10 @@ function formatAnalysisOutput(analysisText) {
         
         let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
         
-        // Regex para extrair APENAS NÚMEROS (inteiros ou decimais)
-        // O prompt foi ajustado para gerar apenas o número na lista Markdown
-        const regexMedia = /\*\*\s*Média de Acertos\s*\*\*\s*:\s*(\d+(\.\d+)?)/i;
-        const regexMaior = /\*\*\s*Maior Pontuação\s*\*\*\s*:\s*(\d+)/i;
-        const regexMenor = /\*\*\s*Menor Pontuação\s*\*\*\s*:\s*(\d+)/i;
+        // Regex ULTRA-TOLERANTE: Captura qualquer número (inteiro ou decimal), ignorando qualquer coisa antes de dois pontos (:)
+        const regexMedia = /\*\*Média de Acertos\*\*[\s\S]*?:[\s]*(\d+(\.\d+)?)/i;
+        const regexMaior = /\*\*Maior Pontuação\*\*[\s\S]*?:[\s]*(\d+)/i;
+        const regexMenor = /\*\*Menor Pontuação\*\*[\s\S]*?:[\s]*(\d+)/i;
         
         // Extrai os dados
         const media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
