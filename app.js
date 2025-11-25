@@ -5,10 +5,14 @@ const BACKEND_URL = '/api/analyze';
 function csvToJson(csvContent) {
     if (!csvContent) return "[]";
     
-    // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
-    const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+    // >> SOLUÇÃO FINAL PARA ERRO DE LEITURA: NORMALIZAÇÃO DE QUEBRA DE LINHA
+    // Trata \r\n (Windows), \r (Mac antigo) e \n (Linux/Web) para garantir a divisão correta.
+    const normalizedContent = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // >> NOVO TRATAMENTO DE ERRO AQUI: Se não houver linhas, retorna um JSON vazio.
+    // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
+    const lines = normalizedContent.split('\n').filter(line => line.trim() !== '');
+
+    // Se não houver linhas, retorna um JSON vazio.
     if (lines.length === 0) {
         console.error("CSV vazio após filtragem de linhas. O arquivo pode estar vazio ou a codificação está incorreta.");
         return "[]"; 
@@ -97,7 +101,7 @@ document.getElementById('analiseForm').addEventListener('submit', async function
 
         // Verifica se a conversão resultou em JSON vazio
         if (jsonGabarito === "[]" || jsonResultados === "[]") {
-             alert("A conversão JSON falhou. Verifique se seus arquivos CSV não estão vazios e se a codificação é UTF-8.");
+             alert("A conversão JSON falhou. Seus arquivos CSV podem estar vazios ou o formato de codificação é incompatível.");
              botao.disabled = false;
              return;
         }
