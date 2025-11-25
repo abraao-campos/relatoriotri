@@ -1,8 +1,13 @@
-// api/analyze.js - Código Completo e Integrado para Serverless
+// api/analyze.js - Código Final com Forçamento de Variável de Ambiente
 
 const { GoogleGenAI } = require('@google/genai');
-// A chave será carregada automaticamente se o nome for GEMINI_API_KEY
-const ai = new GoogleGenAI({}); 
+
+// FORÇA A UTILIZAÇÃO DA VARIÁVEL DE AMBIENTE CHAVE
+// A variável deve ser nomeada como GEMINI_API_KEY no painel do seu host.
+// Se o nome no seu host for DIFERENTE (ex: AI_KEY), mude o nome aqui: process.env.AI_KEY
+const ai = new GoogleGenAI({ 
+    apiKey: process.env.GEMINI_API_KEY 
+}); 
 
 // --- Função Helper: Chunking ---
 function chunkArray(array, chunkSize) {
@@ -14,21 +19,20 @@ function chunkArray(array, chunkSize) {
 }
 
 // --- Handler Principal (Exportação) ---
-// Esta função é o ponto de entrada para a rota /api/analyze
-
 module.exports = async (req, res) => {
     
-    // Configura o header de Content-Type para JSON
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-    // Retorna 405 se o método não for POST
     if (req.method !== 'POST') {
         return res.status(405).json({ success: false, error: "Método não permitido. Use POST." });
     }
 
-    // O grande bloco try/catch captura erros críticos e garante que a função 
-    // termine com uma resposta HTTP correta (200, 400 ou 500).
     try {
+        // VERIFICAÇÃO ADICIONAL: Verifica se a chave foi carregada antes de qualquer chamada API
+        if (!process.env.GEMINI_API_KEY) {
+             throw new Error("Variável de ambiente GEMINI_API_KEY não está definida. Verifique a configuração do seu host.");
+        }
+        
         // --- 1. Extração de Dados ---
         const { resultadosContent, resultadosFilename } = req.body;
         const alunosOriginal = JSON.parse(resultadosContent);
@@ -59,7 +63,7 @@ module.exports = async (req, res) => {
             let prompt;
 
             if (i === 0) {
-                // Prompt completo para o primeiro lote (inclui análise qualitativa)
+                // Prompt completo para o primeiro lote
                 prompt = `Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
                 
                 **Instruções de Saída:**
@@ -131,15 +135,12 @@ module.exports = async (req, res) => {
         });
 
     } catch (e) {
-        // Se qualquer erro ocorrer (API, JSON.parse, etc.), ele é capturado aqui,
-        // garantindo que o Status 500 seja evitado e o frontend receba uma mensagem JSON controlada.
+        // Captura qualquer erro não tratado e formata como JSON de erro
         
-        // Determina o status: 400 para erros do usuário/input, 500 para falha interna ou de API
-        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações")) ? 400 : 500;
+        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações") || e.message.includes("GEMINI_API_KEY não está definida")) ? 400 : 500;
 
         console.error(`ERRO CRÍTICO NO HANDLER (Status ${statusCode}):`, e.message);
         
-        // Retorna a resposta de erro com o status apropriado
         return res.status(statusCode).json({ 
             success: false, 
             error: `Falha no processamento: ${e.message}`
