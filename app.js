@@ -1,29 +1,31 @@
 // URL da sua função serverless.
-const BACKEND_URL = '/api/analyze';
+const BACKEND_URL = '/api/analyze'; 
+
 // FUNÇÃO CHAVE: Converte o texto CSV bruto em um Array de Objetos JSON
 function csvToJson(csvContent) {
     if (!csvContent) return "[]";
-// Solução de Robustez: Limpeza e Normalização de Quebra de Linha
+    
+    // Solução de Robustez: Limpeza e Normalização de Quebra de Linha
     let normalizedContent = csvContent
         .replace(/\r\n/g, '\n') // Trata Windows CRLF
         .replace(/\r/g, '\n')   // Trata Mac antigo CR
-        .replace(/[\u200B-\u200D\uFEFF]/g, '');
-// Remove BOM e caracteres invisíveis
+        .replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove BOM e caracteres invisíveis
 
     // Divide o conteúdo em linhas e remove linhas vazias/apenas espaço
     const lines = normalizedContent.split('\n').filter(line => line.trim() !== '');
-// Se não houver linhas após a limpeza
+
+    // Se não houver linhas após a limpeza
     if (lines.length === 0) {
         console.error("CSV vazio após filtragem de linhas.");
         return "[]"; 
     }
     
     // Detecta o separador: tenta ponto-e-vírgula ou vírgula (padrão internacional)
-    let separator = lines[0].includes(';') ?
-    ';' : ',';
+    let separator = lines[0].includes(';') ? ';' : ',';
     
     // Obtém e limpa os cabeçalhos (primeira linha)
     const headers = lines[0].split(separator).map(header => header.trim());
+    
     const result = [];
     
     // Itera sobre as linhas de dados (começa da linha 1)
@@ -140,7 +142,7 @@ async function sendToBackend(data) {
             statusDiv.innerHTML = `✅ Análise concluída!`;
             statusDiv.classList.remove('loading');
             
-            // >> ALTERADO: Chama a função de formatação com os campos estruturados do novo backend
+            // Chama a função de formatação com os campos estruturados do novo backend
             resultadoTexto.innerHTML = formatAnalysisOutput(result.relatorio_alunos, result.resumo_e_metricas);
         } else {
             // Erro retornado pelo backend
@@ -195,7 +197,8 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         // Define o total de questões baseado no primeiro aluno
         totalQuestoes = relatorio_alunos[0].Total_Questoes;
         relatorio_alunos.forEach(aluno => {
-            const acertos = parseInt(aluno.Acertos, 10);
+            // O uso de parseInt() no front-end é robusto para o campo Acertos
+            const acertos = parseInt(aluno.Acertos, 10); 
             if (!isNaN(acertos)) {
                 totalAcertos += acertos;
                 maiorPontuacao = Math.max(maiorPontuacao, acertos);
@@ -219,12 +222,13 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         });
     } catch (e) {
         console.error("Erro na Formatação/Recálculo do JSON:", e);
+        // Retorna o erro capturado para exibição na página
         return '<h3>Erro ao processar os Dados de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. Detalhes do erro: ' + e.message + '</p>';
     }
 }
 
 
-// >> FUNÇÃO: Monta o HTML
+// >> FUNÇÃO: Monta o HTML (COM CORREÇÃO DE ROBUSTEZ)
 function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto }) {
     
     // Processamento do texto de observações que agora vem limpo ou extraído do bloco ```text
@@ -239,7 +243,11 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     `;
 // Formata o relatório por aluno
     relatorio_alunos.forEach(aluno => {
-        const percent = parseFloat(aluno.Percentual_Acerto.replace(',', '.')); // Garante que a vírgula funcione no parseFloat
+        // <<<< CORREÇÃO DE ROBUSTEZ AQUI >>>>
+        // Usa o valor do backend, ou "0,00" se for null/undefined (para evitar o erro .replace)
+        const percentualAcertoSeguro = aluno.Percentual_Acerto || "0,00"; 
+        
+        const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
         const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
 
         htmlOutput += `
@@ -250,7 +258,7 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
                     <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
                     <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
                     <li><strong>% de Acerto:</strong> 
-            <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
+            <strong style="color: ${color};">${aluno.Percentual_Acerto || '0,00'}%</strong></li>
                 </ul>
             </div>
         `;
