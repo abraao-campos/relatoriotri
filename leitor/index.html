@@ -47,7 +47,6 @@
             background-color: #e9f5ff;
             color: #007bff;
             border-radius: 5px;
-            /* REMOVIDO: display: none; para garantir que a mensagem de status apareça */
             text-align: left;
         }
         .button-group { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
@@ -272,7 +271,6 @@
             gabaritoOficialSection.style.display = 'none';
             inputSection.style.display = 'block';
             resultadoDiv.textContent = `Gabarito Oficial (Q1-Q${NUM_QUESTOES}) definido. Turma ${turmaInput.value} travada. Preencha o nome do aluno e carregue a imagem.`;
-            // Remove o display none se ele tivesse sido ativado em algum momento (Embora o CSS inicial não o ative mais)
             resultadoDiv.style.display = 'block'; 
             validarFormularioAluno(); 
         });
@@ -285,9 +283,13 @@
                 reader.onload = function(e) {
                     gabaritoPreview.src = e.target.result;
                     gabaritoPreview.style.display = 'block';
+                    // NOTA: AQUI VAMOS APENAS GARANTIR QUE A IMAGEM FOI SELECIONADA.
+                    // O PROCESSAMENTO DA BASE64 SERÁ FEITO DENTRO DO processarBtn.
                     gabaritoParaProcessar = e.target.result; 
                     validarFormularioAluno(); 
                 }
+                // SE O ARQUIVO FOR GRANDE, ISTO PODE DEMORAR E FALHAR.
+                // A conversão Base64 ocorrerá agora antes da validação.
                 reader.readAsDataURL(file);
             } else {
                 gabaritoPreview.style.display = 'none';
@@ -298,18 +300,21 @@
         
         alunoInput.addEventListener('input', validarFormularioAluno);
 
-        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (VERSÃO SIMPLIFICADA E ROBUSTA)
+        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (VERSÃO SIMPLES: CHECA APENAS SE HÁ ARQUIVO NO INPUT)
         function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
-            const imagemCarregada = gabaritoParaProcessar !== null;
+            
+            // NOVO: Apenas verifica se um arquivo foi SELECIONADO no input, ignorando o estado Base64.
+            const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
+
             const confirmacaoVisivel = leituraConfirmacaoDiv.style.display !== 'none';
-            const podeProcessar = alunoValido && imagemCarregada && !confirmacaoVisivel;
+            const podeProcessar = alunoValido && imagemSelecionada && !confirmacaoVisivel;
             
             resultadoDiv.style.display = 'block'; // Garante que a div está visível
             
             if (podeProcessar) {
                  // Estado de OK para processar
-                 resultadoDiv.textContent = `Pronto para processar gabarito de ${alunoInput.value.trim()} (Total: ${dadosGabaritos.length}). Clique no botão verde.`;
+                 resultadoDiv.textContent = `✅ Pronto para processar gabarito de ${alunoInput.value.trim()} (Total: ${dadosGabaritos.length}). Clique no botão verde.`;
                  resultadoDiv.style.backgroundColor = '#d4edda'; // Verde claro
                  resultadoDiv.style.borderColor = '#c3e6cb';
                  resultadoDiv.style.color = '#155724';
@@ -317,7 +322,7 @@
                 // Estado de BLOQUEIO (motivo)
                 let statusMsg = "🚧 Botão desabilitado. Motivo: ";
                 if (!alunoValido) statusMsg += "1. Nome do aluno ausente/inválido. ";
-                if (!imagemCarregada) statusMsg += "2. Arquivo da imagem não carregado. ";
+                if (!imagemSelecionada) statusMsg += "2. Arquivo da imagem não carregado. ";
 
                 resultadoDiv.textContent = statusMsg.trim();
                 resultadoDiv.style.backgroundColor = '#fff3cd'; 
@@ -348,6 +353,11 @@
             resultadoDiv.textContent = `Processando gabarito de ${alunoEmProcessamento} (${turma}) com Inteligência Artificial (Gemini)...`;
             
             try {
+                // VALIDAÇÃO DA BASE64: GARANTIMOS QUE É UMA STRING VÁLIDA AQUI
+                if (typeof gabaritoParaProcessar !== 'string' || !gabaritoParaProcessar.startsWith('data:image')) {
+                     throw new Error("Erro na Base64: A imagem não foi lida corretamente. Tente reenviar o arquivo.");
+                }
+
                 // Remove o prefixo "data:image/jpeg;base64," ou similar
                 const base64Data = gabaritoParaProcessar.split(',')[1]; 
 
