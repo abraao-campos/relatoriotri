@@ -36,6 +36,7 @@ function csvToJson(csvContent) {
         const values = currentLine.split(separator).map(value => value.trim());
         // Garante que o número de colunas bate com o cabeçalho
         if (values.length !== headers.length) {
+            // AVISO: Esta linha é ignorada, mas indica um problema no CSV de origem
             console.warn(`Linha ignorada devido a colunas inconsistentes: ${currentLine}`);
             continue;
         }
@@ -164,7 +165,7 @@ async function sendToBackend(data) {
 }
 
 
-// >> FUNÇÃO DE FORMATAÇÃO E RECALCULO (Simplificada para o novo formato de dados de entrada)
+// >> FUNÇÃO DE FORMATAÇÃO E RECALCULO
 function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) { 
     let media = 'N/A';
     let maior = 'N/A';
@@ -180,8 +181,9 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         
         // 1. EXTRAÇÃO DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
         if (resumo_e_metricas) {
-            // CORREÇÃO CRUCIAL DA REGEX: Mais flexível para capturar o bloco 'text' até o fechamento ```
-            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)\s*```/i);
+            // CORREÇÃO DA REGEX: Mais robusta para capturar o bloco 'text' até o fechamento ```
+            // Captura tudo [s\S] entre ```text e ```, ignorando espaços/quebras de linha ao redor
+            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)```/i);
             
             if (obsMatch && obsMatch[1]) {
                  // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
@@ -243,7 +245,9 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     `;
 // Formata o relatório por aluno
     relatorio_alunos.forEach(aluno => {
-        // CORREÇÃO DE ROBUSTEZ: Usa o valor do backend, ou "0,00" se for null/undefined
+        // CORREÇÃO DE ROBUSTEZ 1: Garante que Erros não seja 'undefined'
+        const errosSeguro = aluno.Erros || 'N/A';
+        // CORREÇÃO DE ROBUSTEZ 2: Garante que Percentual_Acerto não seja 'undefined'
         const percentualAcertoSeguro = aluno.Percentual_Acerto || "0,00"; 
         
         const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
@@ -255,9 +259,9 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
             <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
                 <ul style="list-style-type: none; padding: 0;">
                     <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
-                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
+                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${errosSeguro}</span></li>
                     <li><strong>% de Acerto:</strong> 
-            <strong style="color: ${color};">${aluno.Percentual_Acerto || '0,00'}%</strong></li>
+            <strong style="color: ${color};">${percentualAcertoSeguro}%</strong></li>
                 </ul>
             </div>
         `;
