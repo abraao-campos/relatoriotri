@@ -326,7 +326,7 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
                 Notas Finais
             </h4>
             
-            <div style="background-color: #fff; padding: 15px; border-radius: 6px; border: 1px dashed #ccc; max-height: 350px; overflow-y: auto;">
+            <div style="background-color: #fff; padding: 15px; border-radius: 6px; border: 1px dashed #ccc;">
                 ${notasHtmlVertical}
             </div>
             
