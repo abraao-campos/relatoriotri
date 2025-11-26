@@ -28,320 +28,264 @@ function csvToJson(csvContent) {
     
     const result = [];
     
-    // Itera sobre as linhas de dados (começa da linha 1)
+    // Itera sobre as linhas de dados (a partir da segunda linha, pois a primeira é o cabeçalho)
     for (let i = 1; i < lines.length; i++) {
-        const currentLine = lines[i];
-        if (!currentLine) continue;
-
-        const values = currentLine.split(separator).map(value => value.trim());
-        // Garante que o número de colunas bate com o cabeçalho
+        const currentline = lines[i];
+        const values = currentline.split(separator).map(value => value.trim());
+        
+        // Ignora linhas que não têm o número correto de colunas (proteção extra)
         if (values.length !== headers.length) {
-            console.warn(`Linha ignorada devido a colunas inconsistentes: ${currentLine}`);
+            console.warn(`Linha ${i + 1} ignorada: número de colunas (${values.length}) não corresponde ao cabeçalho (${headers.length}).`);
             continue;
         }
-
+        
         const obj = {};
         for (let j = 0; j < headers.length; j++) {
-            // Cria o objeto { "Nome da Coluna": "Valor" }
             obj[headers[j]] = values[j];
         }
         result.push(obj);
     }
     
-    // Retorna a string JSON compacta
-    return JSON.stringify(result, null, 2); 
+    return JSON.stringify(result, null, 2);
 }
 
-
-// Função auxiliar para ler um arquivo como texto, retornando uma Promise
-function readFileAsText(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target.result);
-        reader.onerror = (error) => reject(error);
-        reader.readAsText(file);
-    });
-}
-
-document.getElementById('analiseForm').addEventListener('submit', async function(e) {
-    e.preventDefault(); 
+/**
+ * Função responsável por renderizar os resultados na interface.
+ * @param {string} relatorioJSON - String contendo o JSON estruturado.
+ * @param {string} observacoesTexto - Texto de observações fora do JSON.
+ */
+function renderizarResultados(relatorioJSON, observacoesTexto) {
+    const resultadoDiv = document.getElementById('resultadoAnalise');
+    const estatisticasDiv = document.getElementById('estatisticasGerais');
+    const relatorioTextoDiv = document.getElementById('relatorioTexto');
+    const analiseDetalhadaDiv = document.getElementById('analiseDetalhada');
     
-    const resultadosInput = document.getElementById('arquivoResultados'); // APENAS UM INPUT
-    const statusDiv = document.getElementById('status');
-    const resultadoTexto = document.getElementById('resultadoTexto');
-    const botao = document.getElementById('botaoAnalisar');
+    resultadoDiv.style.display = 'block';
+    
+    // 1. Limpa as seções
+    estatisticasDiv.innerHTML = '';
+    relatorioTextoDiv.innerHTML = '';
+    analiseDetalhadaDiv.innerHTML = '';
 
-    // Verificação básica dos arquivos
-    if (resultadosInput.files.length === 0) {
-        alert("Por favor, selecione o Arquivo de Resultados da Turma.");
+    let relatorio;
+    try {
+        relatorio = JSON.parse(relatorioJSON);
+    } catch (e) {
+        // Se a IA não retornou um JSON válido (erro inesperado)
+        console.error("Erro ao parsear JSON:", e);
+        relatorioTextoDiv.innerHTML = `
+            <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px; border: 1px solid #f5c6cb;">
+                <strong>Erro de Formato:</strong> O relatório principal não é um JSON válido. Exibindo apenas o texto de observação.<br>
+                <strong style="display: block; margin-top: 10px;">Erro de Parsing:</strong> ${e.message}
+            </div>
+            <div style="margin-top: 15px; padding-left: 5px; color: #555;">${observacoesTexto}</div>
+        `;
         return;
     }
-
-    // Preparar o estado da interface
-    botao.disabled = true;
-    statusDiv.style.display = 'block';
     
-    // >> NOVO TEXTO CURTO E OBJETIVO
-    statusDiv.innerHTML = '⏳ Preparando dados...';
+    // 2. Extrai dados do JSON
+    const { 
+        analiseGeral, 
+        analisePorQuestao, 
+        analisePorAluno, 
+        maiorPontuacao, 
+        menorPontuacao 
+    } = relatorio;
+
+    // Garante que os valores existam ou usa um fallback
+    const geral = analiseGeral || {};
+    const questoes = analisePorQuestao || [];
+    const alunos = analisePorAluno || [];
+    const maior = maiorPontuacao !== undefined ? maiorPontuacao : 'N/A';
+    const menor = menorPontuacao !== undefined ? menorPontuacao : 'N/A';
     
-    statusDiv.classList.add('loading');
-    resultadoTexto.textContent = 'Aguarde o processamento...';
-
-    const arquivoResultados = resultadosInput.files[0];
-
-    try {
-        // Leitura do arquivo
-        const rawResultados = await readFileAsText(arquivoResultados);
+    // 3. Monta as Estatísticas Gerais (Top Box)
+    let statsHtml = `
+        <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #007bff;">Média de Acertos</strong>
+            <h4 style="margin: 0; color: #007bff;">${geral.mediaAcertos || 'N/A'}</h4>
+        </div>
         
-        // CONVERTER RAW TEXT (CSV) PARA JSON STRING
-        statusDiv.innerHTML = '✨ Lendo e convertendo o arquivo...';
-
-        const jsonResultados = csvToJson(rawResultados);
-
-        // Verifica se a conversão resultou em JSON vazio
-        if (jsonResultados === "[]") {
-             alert("A conversão JSON falhou. Seu arquivo CSV pode estar vazio ou o formato de codificação é incompatível.");
-             botao.disabled = false;
-             return;
-        }
-
-        // Dados a serem enviados para o backend
-        const dadosParaEnvio = {
-            resultadosContent: jsonResultados,
-            resultadosFilename: arquivoResultados.name
-        };
-
-        // Envia os dados para o backend
-        await sendToBackend(dadosParaEnvio);
-
-    } catch (error) {
-        // Erro de leitura de arquivo (local)
-        statusDiv.innerHTML = `❌ Erro ao ler o arquivo: ${error.message}`;
-        botao.disabled = false;
-
-    }
-});
-
-
-// Função responsável pela comunicação com o Backend Serverless
-async function sendToBackend(data) {
-    const statusDiv = document.getElementById('status');
-    const botao = document.getElementById('botaoAnalisar');
-    const resultadoTexto = document.getElementById('resultadoTexto');
-
-    // >> NOVO TEXTO SIMPLIFICADO DURANTE A COMUNICAÇÃO COM O SERVIDOR
-    statusDiv.innerHTML = '🤖 Analisando...'; 
-    
-    try {
-        const response = await fetch(BACKEND_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json; charset=utf-8' 
-            },
-            body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            statusDiv.innerHTML = `✅ Análise concluída!`;
-            statusDiv.classList.remove('loading');
-            
-            // >> NOVO PASSO: Formatação do Resultado (Chamada à nova função)
-            resultadoTexto.innerHTML = formatAnalysisOutput(result.analysis);
-            
-        } else {
-            // Erro retornado pelo backend
-            statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
-            statusDiv.classList.remove('loading');
-            resultadoTexto.textContent = `Não foi possível obter a análise. Detalhes: ${result.error}`;
-        }
-
-    } catch (error) {
-        // Erro de rede ou comunicação
-        statusDiv.innerHTML = '❌ Erro de conexão com o servidor de análise.';
-        statusDiv.classList.remove('loading');
-        resultadoTexto.textContent = `Erro de rede: ${error.message}`;
-
-    } finally {
-        // Reabilitar o botão
-        botao.disabled = false;
-    }
-}
-
-
-// >> FUNÇÃO DE FORMATAÇÃO E RECALCULO
-function formatAnalysisOutput(analysisText) {
-    let media = 'N/A';
-    let maior = 'N/A';
-    let menor = 'N/A';
-    let totalQuestoes = 'N/A';
-
-    try {
-        // 1. Encontra e extrai o bloco JSON de ALUNOS
-        const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
+        <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #28a745;">Maior Pontuação</strong>
+            <h4 style="margin: 0; color: #28a745;">${maior} Acertos</h4>
+        </div>
         
-        if (!jsonMatch) {
-            // Se o JSON não for encontrado, tentamos extrair o resumo por Regex como fallback
-            const regexMedia = /Média de Acertos.*?(\d+[\.,]?\d*)/is; 
-            const regexMaior = /Maior Pontuação.*?(\d+)/is;
-            const regexMenor = /Menor Pontuação.*?(\d+)/is;
-
-            const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
-            const jsonBlockEndIndex = jsonMatch ? jsonMatch.index + jsonMatch[0].length : 0;
-            const obsBlockStartIndex = obsMatch ? obsMatch.index : analysisText.length;
-            let metricasMarkdown = analysisText.substring(jsonBlockEndIndex, obsBlockStartIndex).trim();
-
-            media = metricasMarkdown.match(regexMedia)?.[1] || 'N/A';
-            maior = metricasMarkdown.match(regexMaior)?.[1] || 'N/A';
-            menor = metricasMarkdown.match(regexMenor)?.[1] || 'N/A';
-            
-            return '<h3>Erro de Formato: JSON de Alunos não encontrado.</h3><p>O Gemini não forneceu o relatório de alunos no formato JSON esperado. Os dados abaixo são extraídos do texto e podem ser imprecisos.</p>' + formatHtmlOutput({ relatorio_alunos: [], media, maior, menor, totalQuestoes: 'N/A', analysisText });
-        }
-        
-        const jsonString = jsonMatch[1];
-        const relatorio_alunos = JSON.parse(jsonString); 
-        
-        // 2. RECALCULAR MÉTRICAS (GARANTINDO 100% DE PRECISÃO)
-        let totalAcertos = 0;
-        let maiorPontuacao = 0;
-        let menorPontuacao = Infinity; // Inicia com um valor alto para ser facilmente substituído
-
-        if (relatorio_alunos.length > 0) {
-            // Define o total de questões baseado no primeiro aluno
-            totalQuestoes = relatorio_alunos[0].Total_Questoes;
-
-            relatorio_alunos.forEach(aluno => {
-                const acertos = parseInt(aluno.Acertos, 10);
-                if (!isNaN(acertos)) {
-                    totalAcertos += acertos;
-                    maiorPontuacao = Math.max(maiorPontuacao, acertos);
-                    menorPontuacao = Math.min(menorPontuacao, acertos);
-                }
-            });
-
-            // Calcula a média e formata para 2 casas decimais
-            media = (totalAcertos / relatorio_alunos.length).toFixed(2);
-            maior = maiorPontuacao;
-            menor = menorPontuacao;
-        }
-
-        // 3. Extrai o bloco de CÓDIGO de OBSERVAÇÕES GERAIS (robusto contra formatação ```text)
-        const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
-        let observacoesTexto = 'Nenhuma observação detalhada foi fornecida.';
-        
-        if (obsMatch && obsMatch[1]) {
-            // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
-            observacoesTexto = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
-        }
-
-        // 4. Monta o HTML final com os dados recalculados
-        return formatHtmlOutput({
-            relatorio_alunos,
-            media: media.replace('.', ','), // Formata de volta para padrão brasileiro
-            maior,
-            menor,
-            totalQuestoes,
-            observacoesTexto
-        });
-
-    } catch (e) {
-        console.error("Erro na Formatação/Recálculo do JSON:", e);
-        return '<h3>Erro ao processar o JSON de Resultados</h3><p>Ocorreu um erro ao tentar ler os dados detalhados. O relatório bruto está abaixo. Detalhes do erro: ' + e.message + '</p><pre>' + analysisText + '</pre>';
-    }
-}
-
-
-// >> FUNÇÃO: Monta o HTML
-function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto, analysisText }) {
-    
-    // Processamento do texto de observações se vier da extração do Gemini
-    let obsTextoFinal = observacoesTexto;
-    if (typeof analysisText !== 'undefined' && typeof observacoesTexto === 'undefined') {
-         // Tenta extrair observações se o JSON falhou, mas temos o texto bruto
-        const obsMatch = analysisText.match(/```text\s*([\s\S]*?)\n```/i);
-        if (obsMatch && obsMatch[1]) {
-            obsTextoFinal = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
-        } else {
-             obsTextoFinal = 'Nenhuma observação detalhada foi fornecida.';
-        }
-    }
-
-
-    let htmlOutput = `
-        <h4 style="margin-top: 5px; color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
-            Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
-        </h4>
-        <h3>Relatório Detalhado por Aluno</h3>
-        <hr>
+        <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #dc3545;">Menor Pontuação</strong>
+            <h4 style="margin: 0; color: #dc3545;">${menor} Acertos</h4>
+        </div>
     `;
+    estatisticasDiv.innerHTML = statsHtml;
     
-    // Formata o relatório por aluno
-    relatorio_alunos.forEach(aluno => {
-        const percent = parseFloat(aluno.Percentual_Acerto.replace(',', '.')); // Garante que a vírgula funcione no parseFloat
-        const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
+    // 4. Monta o Relatório de Texto/Observações
+    const observacoesHtml = observacoesTexto.split('\n').map(p => p.trim()).filter(p => p.length > 0).join('<br>');
 
-        htmlOutput += `
-            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
-                <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
-                <ul style="list-style-type: none; padding: 0;">
-                    <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
-                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
-                    <li><strong>% de Acerto:</strong> <strong style="color: ${color};">${aluno.Percentual_Acerto}%</strong></li>
-                </ul>
+    relatorioTextoDiv.innerHTML = `
+        <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
+            <div style="padding-left: 5px; color: #555;">
+                ${observacoesHtml || 'Nenhuma observação textual foi gerada pelo Gemini.'}
+            </div>
+        </div>
+    `;
+
+    // 5. Monta a Análise Detalhada (Por Questão)
+    let analiseQuestaoHtml = '<h3>Análise Detalhada por Questão</h3>';
+    analiseQuestaoHtml += `<p>${questoes.length} Questões analisadas.</p>`;
+    analiseQuestaoHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">';
+
+    questoes.forEach(q => {
+        const acertoPercent = q.percentualAcerto || 0;
+        let corBorda = '#dc3545'; // Vermelho (Baixo)
+        if (acertoPercent >= 70) corBorda = '#28a745'; // Verde (Alto)
+        else if (acertoPercent >= 40) corBorda = '#ffc107'; // Amarelo (Médio)
+
+        analiseQuestaoHtml += `
+            <div style="border: 1px solid #eee; border-left: 4px solid ${corBorda}; padding: 15px; border-radius: 6px; background-color: #fcfcfc; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <strong style="font-size: 1.1em; color: ${corBorda};">Questão ${q.numero || 'N/A'}</strong> 
+                <span style="float: right; font-weight: bold; color: #343a40;">${acertoPercent}% Acerto</span>
+                <p style="margin: 5px 0 0; font-size: 0.9em; color: #6c757d;">Habilidade: ${q.habilidade || 'N/A'}</p>
+                <p style="margin: 0; font-size: 0.9em; color: #6c757d;">Foco: ${q.foco || 'N/A'}</p>
+                <p style="margin-top: 10px; font-size: 0.95em; color: #555;">${q.resumoDesempenho || 'Sem resumo.'}</p>
+            </div>
+        `;
+    });
+
+    analiseQuestaoHtml += '</div>';
+    analiseDetalhadaDiv.innerHTML += analiseQuestaoHtml;
+
+    // 6. Monta a Análise Detalhada (Por Aluno)
+    let analiseAlunoHtml = '<h3>Feedback Individual por Aluno</h3>';
+    analiseAlunoHtml += `<p>${alunos.length} Alunos avaliados.</p>`;
+    analiseAlunoHtml += '<div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; border-radius: 6px; margin-top: 15px;">';
+
+    alunos.forEach(a => {
+        analiseAlunoHtml += `
+            <div style="background-color: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 4px; border-left: 3px solid #007bff;">
+                <strong style="color: #007bff;">${a.nome || 'Aluno'}</strong> 
+                <span style="float: right; font-weight: bold; color: #343a40;">Pontuação: ${a.pontuacao || 'N/A'}</span>
+                <p style="margin: 5px 0 0; font-size: 0.9em; color: #555;">${a.feedback || 'Sem feedback individual.'}</p>
             </div>
         `;
     });
     
-    // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
-    let observacoesHtml = obsTextoFinal
-        .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
-        .replace(/\*/g, '•') // Converte * em •
-        .replace(/\n/g, '<br>') // Converte \n em <br>
-        .trim();
-
-
-    htmlOutput += `
-        <br>
-        <h3>Análise Geral de Desempenho da Turma</h3>
-        
-        <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
-            <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
-                Resumo Executivo da Turma
-            </h4>
-            
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: #007bff;">Média de Acertos</strong>
-                    <h4 style="margin: 0; color: #007bff;">${media} Acertos</h4>
-                </div>
-                
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: #28a745;">Maior Pontuação</strong>
-                    <h4 style="margin: 0; color: #28a745;">${maior} Acertos</h4>
-                </div>
-                
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: #dc3545;">Menor Pontuação</strong>
-                    <h4 style="margin: 0; color: #dc3545;">${menor} Acertos</h4>
-                </div>
-            </div>
-
-            <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                <strong style="display: block; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
-                <div style="padding-left: 5px; color: #555;">
-                    ${observacoesHtml}
-                </div>
-            </div>
-
-        </div>
-    `;
-
-    // Se a análise do Gemini falhou em parte, mostra o erro no fim
-    if (typeof analysisText !== 'undefined' && typeof observacoesTexto === 'undefined') {
-        htmlOutput += `<pre style="color: red; margin-top: 20px;">Relatório Bruto do Gemini (JSON não formatado): ${analysisText}</pre>`;
-    }
-
-    return htmlOutput;
+    analiseAlunoHtml += '</div>';
+    analiseDetalhadaDiv.innerHTML += analiseAlunoHtml;
 }
+
+
+// --- Lógica Principal (Eventos) ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    const formAnalise = document.getElementById('formAnalise');
+    const arquivoInput = document.getElementById('arquivoResultados');
+    const promptInput = document.getElementById('promptOpcional');
+    const statusDiv = document.getElementById('status');
+    const botaoAnalisar = document.getElementById('botaoAnalisar');
+
+    formAnalise.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // 1. Coleta e Validação do Arquivo
+        const file = arquivoInput.files[0];
+        if (!file) {
+            statusDiv.className = 'error';
+            statusDiv.textContent = 'Por favor, selecione um arquivo CSV.';
+            return;
+        }
+
+        statusDiv.className = 'loading';
+        statusDiv.textContent = 'Aguardando leitura do arquivo...';
+        botaoAnalisar.disabled = true;
+
+        const reader = new FileReader();
+
+        reader.onload = async (event) => {
+            const resultadosContent = event.target.result;
+            const promptOpcional = promptInput.value.trim();
+
+            statusDiv.textContent = 'Enviando dados para o Gemini... (Pode demorar um pouco)';
+
+            try {
+                // 2. Converte CSV para JSON (apenas para facilitar a comunicação)
+                const alunosJson = csvToJson(resultadosContent);
+                
+                if (alunosJson === "[]") {
+                     throw new Error("O arquivo está vazio ou não contém dados de alunos após o gabarito.");
+                }
+
+                // 3. Chamada à API Serverless (Backend)
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        alunosOriginal: alunosJson, // Envia o JSON dos alunos
+                        resultadosContent: resultadosContent, // Envia o CSV bruto também para o gabarito
+                        promptOpcional: promptOpcional
+                    })
+                });
+
+                const data = await response.json();
+                
+                // 4. Tratamento da Resposta
+                if (data.success) {
+                    statusDiv.className = 'success';
+                    statusDiv.textContent = '✅ Análise Concluída com Sucesso!';
+
+                    const fullAnalysis = data.analysis; 
+                    
+                    // Regex para encontrar o bloco JSON envolvido em ```json\n...\n```
+                    const jsonMatch = fullAnalysis.match(/```json\n([\s\S]*?)\n```/);
+                    
+                    if (jsonMatch && jsonMatch[1]) {
+                        const jsonPart = jsonMatch[1].trim();
+                        
+                        // Extração do texto de observação de forma mais segura.
+                        // Remove o bloco ```json...``` da análise completa.
+                        const textPart = fullAnalysis.replace(jsonMatch[0], '').trim(); 
+                        
+                        renderizarResultados(jsonPart, textPart);
+                    } else {
+                        // Se o JSON não foi encontrado no formato esperado
+                        // Exibe a resposta bruta do Gemini no local do relatório para debug.
+                        document.getElementById('resultadoAnalise').style.display = 'block';
+                        document.getElementById('relatorioTexto').innerHTML = `
+                            <div style="background-color: #ffebee; color: #e53935; padding: 15px; border-radius: 6px; border: 1px solid #e53935;">
+                                <strong>Erro de Formato:</strong> A IA não retornou o JSON estruturado esperado.
+                                <strong style="display: block; margin-top: 10px;">Resposta Bruta do Gemini:</strong>
+                                <pre style="white-space: pre-wrap; word-break: break-all;">${fullAnalysis}</pre>
+                            </div>
+                        `;
+                        throw new Error("O servidor não retornou a análise JSON estruturada no formato esperado. Verifique a resposta bruta.");
+                    }
+
+                } else {
+                    throw new Error(data.error || 'Erro desconhecido na análise.');
+                }
+
+            } catch (error) {
+                console.error("Erro na análise:", error);
+                statusDiv.className = 'error';
+                // Adiciona uma mensagem para o usuário verificar o console se o erro for no parsing
+                const userMessage = error.message.includes("O servidor não retornou a análise JSON estruturada") 
+                    ? "❌ Falha ao processar a resposta do Gemini. Consulte a resposta bruta na tela." 
+                    : `❌ Erro: ${error.message}`;
+                    
+                statusDiv.textContent = userMessage;
+            } finally {
+                botaoAnalisar.disabled = false;
+            }
+        };
+
+        reader.onerror = () => {
+            statusDiv.className = 'error';
+            statusDiv.textContent = '❌ Erro ao ler o arquivo.';
+            botaoAnalisar.disabled = false;
+        };
+
+        reader.readAsText(file);
+    });
+});
