@@ -235,11 +235,15 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
                 const percentCalc = (acertos / totalQuestoesNum) * 100;
                 // Formata com 2 casas decimais e usa vírgula como separador (padrão brasileiro)
                 aluno.Percentual_Acerto = percentCalc.toFixed(2).replace('.', ',');
+                
+                // Adiciona a nota final (0-100)
+                aluno.Nota_Final_100 = percentCalc.toFixed(2).replace('.', ','); 
                 // <<< FIM DO CÁLCULO >>>
             } else {
                 // Garante que o Acertos seja '0' para cálculos se for inválido
                 aluno.Acertos = '0';
                 aluno.Percentual_Acerto = '0,00';
+                aluno.Nota_Final_100 = '0,00'; // Define a nota como 0
             }
         });
 
@@ -271,9 +275,12 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     // Calcula o total de alunos
     const totalAlunos = relatorio_alunos.length;
     
-    // Processamento do texto de observações que agora vem limpo ou extraído do bloco ```text
+    // Processamento do texto de observações
     let obsTextoFinal = observacoesTexto;
 
+    // ----------------------------------------------------------------------
+    // 0. STATUS HEADERS (Sempre no topo como metadados)
+    // ----------------------------------------------------------------------
     let htmlOutput = `
         <h4 style="margin-top: 5px; color: #6c757d; margin-bottom: 5px;">
             Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
@@ -281,41 +288,50 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
         <h4 style="color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-top: 5px;">
             Total de Alunos: <strong>${totalAlunos}</strong>
         </h4>
-        
-        <h3>Relatório Detalhado por Aluno</h3>
-        <hr>
     `;
-// Formata o relatório por aluno
-    relatorio_alunos.forEach(aluno => {
-        // CORREÇÃO DE ROBUSTEZ 1: Garante que Erros não seja 'undefined'
-        const errosSeguro = aluno.Erros || 'N/A';
-        // O Percentual_Acerto agora é garantidamente válido e calculado
-        const percentualAcertoSeguro = aluno.Percentual_Acerto; 
-        
-        const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
-        const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
 
-        htmlOutput += `
-            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
-           
-            <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
-                <ul style="list-style-type: none; padding: 0;">
-                    <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
-                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${errosSeguro}</span></li>
-                    <li><strong>% de Acerto:</strong> 
-            <strong style="color: ${color};">${percentualAcertoSeguro}%</strong></li>
-                </ul>
-            </div>
-        `;
+    // ----------------------------------------------------------------------
+    // 1. MAPA DE NOTAS (0-100) - NOVO 1º ITEM
+    // ----------------------------------------------------------------------
+    let notasTextoCorrido = '';
+    relatorio_alunos.forEach((aluno, index) => {
+        const nota = aluno.Nota_Final_100 || 'N/A';
+        notasTextoCorrido += `${aluno.Aluno}: ${nota}`;
+        
+        if (index < relatorio_alunos.length - 1) {
+            notasTextoCorrido += ' | ';
+        }
     });
-    
-    // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
+
+    const mapaNotasHtml = `
+        <br>
+        <h3>Mapa de Notas (0-100)</h3>
+        
+        <div style="border: 1px solid #6f42c1; padding: 20px; border-radius: 8px; background-color: #f6f0ff;">
+            <h4 style="color: #6f42c1; margin-top: 0; border-bottom: 1px solid #6f42c1; padding-bottom: 10px;">
+                Notas Finais para Diário (Texto Corrido)
+            </h4>
+            
+            <p style="white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: 14px; background-color: #fff; padding: 15px; border-radius: 6px; border: 1px dashed #ccc;">
+                ${notasTextoCorrido}
+            </p>
+            
+            <p style="margin-top: 15px; color: #6f42c1; font-size: 14px;">
+                *Estas notas representam o desempenho percentual do aluno (Acertos / Total de Questões * 100) e podem ser transferidas diretamente para o diário.
+            </p>
+        </div>
+    `;
+
+    // ----------------------------------------------------------------------
+    // 2. ANÁLISE GERAL DE DESEMPENHO DA TURMA - NOVO 2º ITEM
+    // ----------------------------------------------------------------------
     let observacoesHtml = obsTextoFinal
         .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
         .replace(/\*/g, '•') // Converte * em •
         .replace(/\n/g, '<br>') // Converte \n em <br>
         .trim();
-    htmlOutput += `
+
+    const analiseGeralHtml = `
         <br>
         <h3>Análise Geral de Desempenho da Turma</h3>
         
@@ -361,6 +377,46 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
 
         </div>
     `;
+
+    // ----------------------------------------------------------------------
+    // 3. RELATÓRIO DETALHADO POR ALUNO - NOVO 3º ITEM
+    // ----------------------------------------------------------------------
+    let relatorioDetalhadoHtml = `
+        <br>
+        <h3>Relatório Detalhado por Aluno</h3>
+        <hr>
+    `;
+
+    // Formata o relatório por aluno
+    relatorio_alunos.forEach(aluno => {
+        // CORREÇÃO DE ROBUSTEZ 1: Garante que Erros não seja 'undefined'
+        const errosSeguro = aluno.Erros || 'N/A';
+        // O Percentual_Acerto agora é garantidamente válido e calculado
+        const percentualAcertoSeguro = aluno.Percentual_Acerto; 
+        
+        const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
+        const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
+
+        relatorioDetalhadoHtml += `
+            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
+           
+            <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
+                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${errosSeguro}</span></li>
+                    <li><strong>% de Acerto:</strong> 
+            <strong style="color: ${color};">${percentualAcertoSeguro}%</strong></li>
+                </ul>
+            </div>
+        `;
+    });
+
+    // ----------------------------------------------------------------------
+    // 4. CONCATENAÇÃO NA NOVA ORDEM
+    // ----------------------------------------------------------------------
+    htmlOutput += mapaNotasHtml;
+    htmlOutput += analiseGeralHtml;
+    htmlOutput += relatorioDetalhadoHtml;
     
     return htmlOutput;
 }
