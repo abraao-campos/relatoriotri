@@ -449,7 +449,6 @@
             
             // ***PASSO CRUCIAL PARA CALIBRAÇÃO: EXIBE A IMAGEM CORRIGIDA***
             cv.imshow('process-canvas', warped); 
-            // CORREÇÃO: toToDataURL() para toDataURL()
             gabaritoPreview.src = processCanvas.toDataURL(); 
             gabaritoPreview.style.borderColor = '#28a745'; // Borda verde para sucesso na correção
 
@@ -474,8 +473,9 @@
             const COL_WIDTH = TOTAL_RESPONSES_AREA_WIDTH / NUM_COLS;
             const ROW_HEIGHT = TOTAL_RESPONSES_AREA_HEIGHT / QUESTOES_POR_COLUNA;
             
-            // AJUSTE CRÍTICO: Limiar para considerar uma bolha preenchida (MAIS TOLERANTE)
-            const THRESHOLD_FILL = 170; 
+            // AJUSTE CRÍTICO: Limiar para considerar uma bolha preenchida (MAIS TOLERANTE POSSÍVEL)
+            // Aumentado para 200: aceita marcações muito mais claras.
+            const THRESHOLD_FILL = 200; 
 
             // 4.2. Iterar sobre cada Questão e Alternativa
             for (let q = 0; q < NUM_QUESTOES; q++) {
