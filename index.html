@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de Gabaritos (Foto para CSV)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #gabarito-preview {
+            max-width: 100%;
+            max-height: 400px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            display: none; /* Inicialmente oculto */
+        }
+        #resultado {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #007bff;
+            background-color: #e9f5ff;
+            color: #007bff;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Leitor de Gabaritos</h1>
+        <p>Envie a foto do gabarito preenchido pelo aluno para converter em dados CSV.</p>
+
+        <input type="file" id="gabarito-input" accept="image/*">
+        
+        <img id="gabarito-preview" alt="Pré-visualização do Gabarito">
+
+        <div id="resultado"></div>
+
+        <a href="https://relatoriotri.vercel.app/" style="margin-top: 20px; display: inline-block;">↩️ Voltar para a Página de Análise de Resultados</a>
+
+    </div>
+
+    <script>
+        const gabaritoInput = document.getElementById('gabarito-input');
+        const gabaritoPreview = document.getElementById('gabarito-preview');
+        const resultadoDiv = document.getElementById('resultado');
+
+        // 1. Lógica para pré-visualizar a imagem
+        gabaritoInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    gabaritoPreview.src = e.target.result;
+                    gabaritoPreview.style.display = 'block';
+                    resultadoDiv.style.display = 'none';
+                    // CHAMADA PARA A FUNÇÃO PRINCIPAL DE PROCESSAMENTO AQUI
+                    processarImagem(e.target.result); 
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 2. Função principal (Será preenchida no próximo passo)
+        function processarImagem(imageDataURL) {
+            // Neste ponto, teremos que implementar a lógica de visão computacional
+            // para identificar os círculos e as marcações.
+            
+            resultadoDiv.textContent = "Processando imagem... (Lógica de leitura será adicionada)";
+            resultadoDiv.style.display = 'block';
+            
+            // Exemplo de chamada futura:
+            // const dadosCSV = analisarMarcacoes(imageDataURL);
+            // gerarDownloadCSV(dadosCSV);
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Gabarito - Gemini AI</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            color: #6c757d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        /* Novo Bloco Único de Instruções */
+        .upload-info-block {
+            background-color: #e6f7ff; /* Azul claro */
+            border: 1px solid #91d5ff;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .upload-info-block h3 {
+            color: #007bff;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+        }
+
+        .upload-info-block h3 span {
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+
+        .upload-info-block strong {
+            color: #007bff;
+        }
+
+        .upload-info-block ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .upload-info-block li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .upload-info-block li::before {
+            content: '•';
+            color: #007bff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+        }
+
+        .upload-info-block pre {
+            background-color: #f0f8ff;
+            border-left: 3px solid #007bff;
+            padding: 10px 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            color: #333;
+            margin-top: 15px;
+        }
+
+        /* Estilos do Formulário */
+        .form-group {
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 2px dashed #007bff;
+            border-radius: 4px;
+            background-color: #ffffff;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #1e7e34;
+        }
+
+        button:disabled {
+            background-color: #8ac19c;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+            display: none;
+        }
+
+        #status.loading {
+            background-color: #ffc107;
+            color: #343a40;
+            font-weight: bold;
+        }
+
+        #resultadoTexto {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #fefefe;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📋 Análise de Gabarito</h1>
+    <p class="tagline">Utilize esta ferramenta para comparar os resultados de seus alunos com o gabarito oficial e obter relatórios detalhados.</p>
+
+    <form id="analiseForm">
+        
+        <div class="upload-info-block">
+            <h3><span>📁</span> Envio Único: Arquivo de Gabarito e Resultados (.csv)</h3>
+            <p>O arquivo CSV de resultados deve conter **todas as informações de correção** em um único local, utilizando ponto e vírgula (`;`) ou vírgula (`,`) como separador.</p>
+            
+            <ul>
+                <li>A **primeira linha de dados** deve ser o **Gabarito Oficial**. O nome da primeira coluna (Aluno) deve ser "Gabarito Oficial" (ou similar).</li>
+                <li>As linhas seguintes devem ser as marcações dos **alunos** que serão corrigidos.</li>
+                <li>As colunas (a partir da segunda) devem ser as respostas das questões na ordem correta da prova (Ex: 1, 2, 3...).</li>
+            </ul>
+            
+            <p><strong>Exemplo de Estrutura Ideal:</strong></p>
+            <pre>Nome;1;2;3;4;5;...
+Gabarito Oficial;A;C;E;B;D;...
+Aluno A;A;D;E;B;D;...
+Aluno B;A;C;A;B;C;...</pre>
+
+            <div class="form-group">
+                <label for="arquivoResultados">Selecione o arquivo CSV de Resultados (com o Gabarito na primeira linha):</label>
+                <input type="file" id="arquivoResultados" accept=".csv" required>
+            </div>
+        </div>
+        
+        <button type="submit" id="botaoAnalisar">✅ Analisar os Resultados</button>
+        <div id="status"></div>
+    </form>
+
+    <div id="resultadoTexto">
+        <p>Após enviar o arquivo, o relatório de desempenho completo aparecerá nesta área.</p>
+    </div>
+</div>
+
+<script src="app.js"></script> 
+</body>
+</html>
