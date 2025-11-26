@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de Gabaritos (Foto para CSV)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        input[type="file"], input[type="text"] {
+            margin: 10px 0;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="text"]:disabled {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+        #gabarito-preview {
+            max-width: 100%;
+            max-height: 400px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+        #resultado {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #007bff;
+            background-color: #e9f5ff;
+            color: #007bff;
+            border-radius: 5px;
+            display: none;
+        }
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+        #processar-gabarito {
+            background-color: #28a745;
+            color: white;
+        }
+        #processar-gabarito:hover {
+            background-color: #1e7e34;
+        }
+        #encerrar-gabaritos {
+            background-color: #dc3545;
+            color: white;
+            width: 100%;
+            margin-top: 30px;
+        }
+        #encerrar-gabaritos:hover {
+            background-color: #c82333;
+        }
+        #encerrar-gabaritos:disabled {
+            background-color: #f4f4f9;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Leitor de Gabaritos</h1>
+        <p>Preencha os dados e envie a foto do gabarito.</p>
+
+        <input type="text" id="turma-input" placeholder="Turma (Ex: 8A, 3º Ano B)" required>
+        <input type="text" id="aluno-input" placeholder="Nome Completo do Aluno" required>
+
+        <input type="file" id="gabarito-input" accept="image/*">
+        <img id="gabarito-preview" alt="Pré-visualização do Gabarito">
+
+        <div class="button-group">
+            <button id="processar-gabarito" disabled>Processar Gabarito</button>
+        </div>
+
+        <div id="resultado">Aguardando envio da imagem...</div>
+
+        <button id="encerrar-gabaritos" disabled>Encerrar Gabaritos da Turma (Gerar CSV)</button>
+    </div>
+
+    <a href="https://relatoriotri.vercel.app/" style="margin-top: 20px; display: inline-block;">↩️ Voltar para a Página de Análise de Resultados</a>
+
+    <script>
+        const turmaInput = document.getElementById('turma-input');
+        const alunoInput = document.getElementById('aluno-input');
+        const gabaritoInput = document.getElementById('gabarito-input');
+        const gabaritoPreview = document.getElementById('gabarito-preview');
+        const resultadoDiv = document.getElementById('resultado');
+        const processarBtn = document.getElementById('processar-gabarito');
+        const encerrarBtn = document.getElementById('encerrar-gabaritos');
+
+        // Array para armazenar os dados de todos os alunos processados
+        let dadosGabaritos = [];
+        let gabaritoParaProcessar = null;
+
+        // 1. Lógica de Validação e Pré-visualização da Imagem
+        gabaritoInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    gabaritoPreview.src = e.target.result;
+                    gabaritoPreview.style.display = 'block';
+                    // Armazena a URL da imagem (base64) para processamento
+                    gabaritoParaProcessar = e.target.result; 
+                    
+                    // Habilita o botão de processamento se todos os campos estiverem OK
+                    validarFormulario();
+                    resultadoDiv.textContent = "Imagem carregada. Preencha os dados e clique em 'Processar Gabarito'.";
+                }
+                reader.readAsDataURL(file);
+            } else {
+                gabaritoPreview.style.display = 'none';
+                gabaritoParaProcessar = null;
+                validarFormulario();
+            }
+        });
+        
+        // Habilita/Desabilita o botão de processamento com base nos campos
+        turmaInput.addEventListener('input', validarFormulario);
+        alunoInput.addEventListener('input', validarFormulario);
+
+        function validarFormulario() {
+            const turmaValida = turmaInput.value.trim() !== '';
+            const alunoValido = alunoInput.value.trim() !== '';
+            
+            // Requer todos os campos + uma imagem carregada
+            if (turmaValida && alunoValido && gabaritoParaProcessar) {
+                processarBtn.disabled = false;
+            } else {
+                processarBtn.disabled = true;
+            }
+        }
+
+
+        // 2. Lógica de Processamento (Chamada quando o botão é clicado)
+        processarBtn.addEventListener('click', function() {
+            // Desabilita os botões para evitar cliques duplos
+            processarBtn.disabled = true;
+            encerrarBtn.disabled = true; 
+            
+            const turma = turmaInput.value.trim();
+            const aluno = alunoInput.value.trim();
+
+            if (!turma || !aluno || !gabaritoParaProcessar) {
+                 resultadoDiv.textContent = "Erro: Por favor, preencha todos os campos e envie a imagem.";
+                 processarBtn.disabled = false;
+                 return;
+            }
+            
+            resultadoDiv.textContent = `Processando gabarito de ${aluno} (${turma})...`;
+            
+            // >> CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM <<
+            // Esta função será o foco do nosso próximo desenvolvimento
+            const dadosDoAluno = simularProcessamentoImagem(aluno); 
+            
+            // Adiciona a turma e o nome ao resultado final
+            dadosDoAluno.Turma = turma; // Adiciona a turma para o CSV final
+            
+            // Armazena os dados
+            dadosGabaritos.push(dadosDoAluno);
+
+            // Reseta e Atualiza a Interface
+            turmaInput.disabled = true; // Bloqueia a turma para o restante da classe
+            alunoInput.value = ''; // Limpa o nome do aluno
+            gabaritoInput.value = ''; // Limpa o arquivo (necessário para re-upload do mesmo nome)
+            gabaritoPreview.style.display = 'none';
+            gabaritoParaProcessar = null;
+
+            processarBtn.disabled = true;
+            encerrarBtn.disabled = false; // Habilita o encerramento após o 1º aluno
+            resultadoDiv.textContent = `✅ Gabarito de ${aluno} processado! Total de alunos: ${dadosGabaritos.length}. Envie o próximo ou Encerrar.`;
+        });
+        
+        
+        // 3. Funções Placeholder para desenvolvimento
+        
+        // **ESTA FUNÇÃO SERÁ A MAIS IMPORTANTE E MAIS COMPLEXA**
+        // Por enquanto, ela retorna dados simulados.
+        function simularProcessamentoImagem(aluno) {
+            // Simulação do resultado da leitura de imagem (Acertos e Respostas)
+            // Lembre-se, o CSV final exige as respostas das questões
+            // Exemplo: "Aluno";"Q1";"Q2";"Q3"
+            
+            const respostasSimuladas = {
+                // Aqui entraria a lógica que lê a imagem e retorna o array de respostas
+                "Aluno": aluno,
+                "Q1": "A",
+                "Q2": "B",
+                "Q3": "C",
+                "Q4": "A",
+                "Q5": "X" // X = Não Marcou ou Marcou Errado/Nulo
+            };
+            return respostasSimuladas;
+        }
+
+        // 4. Lógica de Encerramento (Geração e Download do CSV)
+        encerrarBtn.addEventListener('click', function() {
+            if (dadosGabaritos.length === 0) {
+                 resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
+                 return;
+            }
+            
+            // >> CHAMA A FUNÇÃO DE GERAÇÃO E DOWNLOAD CSV <<
+            gerarDownloadCSV(); 
+            
+            // Reseta a aplicação para uma nova turma
+            dadosGabaritos = [];
+            turmaInput.disabled = false;
+            turmaInput.value = '';
+            encerrarBtn.disabled = true;
+            resultadoDiv.textContent = "🎉 CSV Gerado! Aplicação reiniciada para uma nova turma.";
+        });
+        
+        
+        // 5. Função de Geração e Download do CSV
+        function gerarDownloadCSV() {
+            // Lembre-se que precisamos do GABARITO OFICIAL como a primeira linha do CSV!
+            
+            // ATENÇÃO: É NECESSÁRIO SABER AS RESPOSTAS DO GABARITO OFICIAL
+            // A solução mais robusta é pedir ao usuário o Gabarito Oficial uma vez.
+            
+            // Por enquanto, vamos assumir um gabarito de 5 questões:
+            const gabaritoOficial = {
+                "Aluno": "Gabarito Oficial",
+                "Q1": "A",
+                "Q2": "B",
+                "Q3": "C",
+                "Q4": "D",
+                "Q5": "E"
+            };
+            
+            const dadosParaCSV = [gabaritoOficial, ...dadosGabaritos];
+            
+            // --- Lógica de Criação de String CSV ---
+            const separador = ';'; // Usaremos ponto e vírgula como padrão
+            const headers = Object.keys(dadosParaCSV[0]); // Pega todas as chaves (Aluno, Q1, Q2...)
+            
+            let csvString = headers.join(separador) + '\n';
+            
+            dadosParaCSV.forEach(row => {
+                const values = headers.map(header => {
+                    // Garante que o valor está entre aspas se contiver o separador (boa prática)
+                    let value = row[header] !== undefined ? String(row[header]) : '';
+                    return `"${value.replace(/"/g, '""')}"`; // Escape aspas duplas e envolve em aspas
+                });
+                csvString += values.join(separador) + '\n';
+            });
+            
+            // --- Download ---
+            const turmaNome = turmaInput.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
+            const data = new Date().toISOString().slice(0, 10);
+            const filename = `Gabaritos_${turmaNome}_${data}.csv`;
+
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            // --- Fim do Download ---
+        }
+
+    </script>
+</body>
+</html>
