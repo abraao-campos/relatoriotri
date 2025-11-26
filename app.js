@@ -181,8 +181,10 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         
         // 1. EXTRAÇÃO DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
         if (resumo_e_metricas) {
-            // Regex robusta para capturar o bloco 'text'
-            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)```/i);
+            // <<< CORREÇÃO FINAL DA REGEX AQUI >>>
+            // Torna o fechamento ``` opcional e captura até o final da string (\s*$)
+            // Isso garante que o conteúdo do bloco 'text' seja capturado mesmo se o fechamento for omitido ou mal formatado.
+            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)(?:```)?\s*$/i);
             
             if (obsMatch && obsMatch[1]) {
                  // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
@@ -211,7 +213,7 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
                 maiorPontuacao = Math.max(maiorPontuacao, acertos);
                 menorPontuacao = Math.min(menorPontuacao, acertos);
                 
-                // <<< CÁLCULO E SOBRESCRITA DO PERCENTUAL AQUI >>>
+                // <<< CÁLCULO E SOBRESCRITA DO PERCENTUAL >>>
                 const percentCalc = (acertos / totalQuestoesNum) * 100;
                 // Formata com 2 casas decimais e usa vírgula como separador (padrão brasileiro)
                 aluno.Percentual_Acerto = percentCalc.toFixed(2).replace('.', ',');
