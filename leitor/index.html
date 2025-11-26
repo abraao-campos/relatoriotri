@@ -461,4 +461,180 @@
             const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
             
             // Calibração dos Espaços (Baseado no modelo de 2 colunas)
-            const NUM_COLS = 2; //
+            const NUM_COLS = 2; // Duas colunas de questões
+            const QUESTOES_POR_COLUNA = NUM_QUESTOES / NUM_COLS;
+            
+            // A largura de cada coluna de resposta (Col 1 ou Col 2) - Excluímos as margens laterais (10%)
+            const TOTAL_RESPONSES_AREA_WIDTH = OUTPUT_WIDTH * 0.8;
+            const TOTAL_RESPONSES_AREA_HEIGHT = OUTPUT_HEIGHT * 0.7; // Excluímos margens e área de identificação
+            
+            // Distância em pixels da borda esquerda da imagem corrigida
+            const X_OFFSET = OUTPUT_WIDTH * 0.1;
+            // Distância em pixels da borda superior
+            const Y_OFFSET = OUTPUT_HEIGHT * 0.2; 
+            
+            const COL_WIDTH = TOTAL_RESPONSES_AREA_WIDTH / NUM_COLS;
+            const ROW_HEIGHT = TOTAL_RESPONSES_AREA_HEIGHT / QUESTOES_POR_COLUNA;
+            
+            // Limiar para considerar uma bolha preenchida (quanto menor, mais escura precisa ser)
+            const THRESHOLD_FILL = 130; // Ajustado de 150 para ser mais seletivo
+
+            // 4.2. Iterar sobre cada Questão e Alternativa
+            for (let q = 0; q < NUM_QUESTOES; q++) {
+                
+                // Determina a coluna (0 para Q1-Q25, 1 para Q26-Q50, etc.)
+                const col = Math.floor(q / QUESTOES_POR_COLUNA);
+                // Determina o índice da linha na coluna
+                const row = q % QUESTOES_POR_COLUNA; 
+                
+                let maiorEscuridao = 255; // Branco puro
+                let respostaAluno = 'B'; // 'B' = Branco/Não marcado (Padrão inicial)
+                let multiMarcacao = false;
+                
+                // Coordenadas iniciais (superior esquerda) para a área da QUESTÃO 'q'
+                const x_q = X_OFFSET + (col * COL_WIDTH);
+                const y_q = Y_OFFSET + (row * ROW_HEIGHT);
+                
+                // Largura reservada para as 5 bolhas de resposta (aproximadamente 60% da COL_WIDTH)
+                const RESPONSE_AREA_WIDTH = COL_WIDTH * 0.6;
+                const BOLHA_WIDTH = RESPONSE_AREA_WIDTH / NUM_ALTERNATIVAS; // Largura aproximada por bolha
+                
+                let marcacoesEncontradas = []; // Para detectar múltiplas marcações
+                
+                for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
+                    
+                    // Posição central X esperada da bolha 'a'
+                    const x_center = x_q + (BOLHA_WIDTH * (a + 0.5));
+                    
+                    // Criar um retângulo pequeno (ROI) no centro da bolha (ajustar os 10/20 pixels conforme o tamanho)
+                    // Altura da bolha deve estar centralizada na linha (ROW_HEIGHT)
+                    let bolhaRect = new cv.Rect(
+                        x_center - 10,  // X inicial
+                        y_q + (ROW_HEIGHT / 2) - 10, // Y inicial (meio da linha)
+                        20,             // Largura (20px)
+                        20              // Altura (20px)
+                    );
+                    
+                    // Garante que o ROI não saia dos limites (embora o warpPerspective ajude)
+                    bolhaRect.x = Math.max(0, bolhaRect.x);
+                    bolhaRect.y = Math.max(0, bolhaRect.y);
+                    bolhaRect.width = Math.min(warped.cols - bolhaRect.x, bolhaRect.width);
+                    bolhaRect.height = Math.min(warped.rows - bolhaRect.y, bolhaRect.height);
+
+                    let bubbleROI = warped.roi(bolhaRect);
+                    let mediaCor = cv.mean(bubbleROI)[0]; 
+                    bubbleROI.delete();
+                    
+                    // Se estiver abaixo do limiar, é uma marcação
+                    if (mediaCor < THRESHOLD_FILL) {
+                        marcacoesEncontradas.push({
+                            alt: alternativas[a],
+                            escuridao: mediaCor
+                        });
+                    }
+                    
+                    // Acompanha o mais escuro
+                    if (mediaCor < maiorEscuridao) {
+                        maiorEscuridao = mediaCor;
+                        respostaAluno = alternativas[a];
+                    }
+                }
+                
+                // 5. Regra de Decisão Final
+                
+                if (marcacoesEncontradas.length > 1) {
+                    // Múltipla marcação (duas ou mais bolhas preenchidas)
+                    respostaAluno = 'X'; 
+                } else if (marcacoesEncontradas.length === 1) {
+                    // Marcação única encontrada
+                    respostaAluno = marcacoesEncontradas[0].alt;
+                } else {
+                    // Nenhuma marcação encontrada (maiorEscuridao > THRESHOLD_FILL)
+                    respostaAluno = 'B'; // Branco/Não marcado
+                }
+
+                // Armazenar a resposta (Q1, Q2, etc.)
+                respostas[`Q${q + 1}`] = respostaAluno;
+            }
+
+            // 6. Cleanup
+            src.delete(); gray.delete(); blurred.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
+            warped.delete(); M.delete(); srcTri.delete(); dstTri.delete();
+            
+            return respostas; 
+        }
+
+        // ... (Seção E e F - Encerramento e Geração CSV - Mantidas) ...
+        encerrarBtn.addEventListener('click', function() {
+            if (dadosGabaritos.length === 0) {
+                 resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
+                 return;
+            }
+            
+            gerarDownloadCSV(); 
+            
+            dadosGabaritos = [];
+            gabaritoOficialRespostas = [];
+            NUM_QUESTOES = 0;
+            NUM_ALTERNATIVAS = 0;
+            
+            turmaInput.disabled = false;
+            turmaInput.value = '';
+            alunoInput.value = '';
+            alunosCountSpan.textContent = '0';
+            encerrarBtn.disabled = true;
+            processarBtn.disabled = true;
+            gabaritoRespostasArea.innerHTML = '';
+            
+            gabaritoOficialSection.style.display = 'none';
+            inputSection.style.display = 'none';
+            configSection.style.display = 'block';
+            
+            resultadoDiv.textContent = "🎉 CSV Gerado com sucesso! Aplicação reiniciada para uma nova turma.";
+            resultadoDiv.style.backgroundColor = '#fff3cd';
+            resultadoDiv.style.borderColor = '#ffeeba';
+            resultadoDiv.style.color = '#856404';
+        });
+        
+        
+        function gerarDownloadCSV() {
+            const gabaritoOficialData = { "Aluno": "Gabarito Oficial" };
+            for (let i = 1; i <= NUM_QUESTOES; i++) {
+                gabaritoOficialData[`Q${i}`] = gabaritoOficialRespostas[i-1];
+            }
+            
+            const dadosParaCSV = [gabaritoOficialData, ...dadosGabaritos];
+            
+            const separador = ';';
+            const headers = Object.keys(dadosParaCSV[0]); 
+            
+            let csvString = headers.join(separador) + '\n';
+            
+            dadosParaCSV.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header] !== undefined ? String(row[header]) : '';
+                    return `"${value.replace(/"/g, '""')}"`;
+                });
+                csvString += values.join(separador) + '\n';
+            });
+            
+            const turmaNome = turmaInput.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
+            const data = new Date().toISOString().slice(0, 10);
+            const filename = `Gabaritos_${turmaNome}_${data}.csv`;
+
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
