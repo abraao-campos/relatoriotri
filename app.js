@@ -143,8 +143,35 @@ async function sendToBackend(data) {
             statusDiv.innerHTML = `✅ Análise concluída!`;
             statusDiv.classList.remove('loading');
             
-            // Chama a função de formatação com os campos estruturados do novo backend
-            resultadoTexto.innerHTML = formatAnalysisOutput(result.relatorio_alunos, result.resumo_e_metricas);
+            // --- NOVO: EXTRAÇÃO ROBUSTA DE DADOS DO CAMPO 'analysis' (CORREÇÃO DO ERRO) ---
+            const fullAnalysisText = result.analysis || '';
+            
+            // 1. Extrair o Bloco JSON (relatorio_alunos)
+            const jsonMatch = fullAnalysisText.match(/```json\n?([\s\S]*?)\n?```/i);
+            let relatorio_alunos = [];
+            
+            if (jsonMatch) {
+                try {
+                    // Tenta parsear o JSON. Se falhar, relatorio_alunos = []
+                    relatorio_alunos = JSON.parse(jsonMatch[1].trim());
+                } catch (e) {
+                    console.error("Erro ao fazer parsing do JSON retornado pelo backend:", e);
+                    // Lança um erro customizado, pois o formato de JSON retornado estava inválido.
+                    throw new Error("Formato JSON inválido retornado pelo servidor de análise. Tente novamente.");
+                }
+            } else {
+                 // Se o bloco ```json não for encontrado, a resposta está incompleta/corrompida.
+                 throw new Error("O servidor de análise não retornou o bloco de dados detalhados esperado (`json`).");
+            }
+
+            // 2. Extrair o Bloco de Métricas e Observações (resumo_e_metricas)
+            // Remove o bloco JSON completo e pega o restante do texto.
+            const resumo_e_metricas = fullAnalysisText.replace(jsonMatch[0], '').trim();
+
+            // Chama a função de formatação com os campos estruturados extraídos
+            resultadoTexto.innerHTML = formatAnalysisOutput(relatorio_alunos, resumo_e_metricas);
+            // -----------------------------------------------------------------
+            
         } else {
             // Erro retornado pelo backend
             statusDiv.innerHTML = `❌ Erro na análise: ${result.error}`;
@@ -153,10 +180,10 @@ async function sendToBackend(data) {
         }
 
     } catch (error) {
-        // Erro de rede ou comunicação
-        statusDiv.innerHTML = '❌ Erro de conexão com o servidor de análise.';
+        // Erro de rede ou comunicação OU erro de parsing de JSON customizado
+        statusDiv.innerHTML = `❌ Erro de conexão ou formato: ${error.message}`;
         statusDiv.classList.remove('loading');
-        resultadoTexto.textContent = `Erro de rede: ${error.message}`;
+        resultadoTexto.textContent = `Erro de rede ou formato: ${error.message}`;
 
     } finally {
         // Reabilitar o botão
@@ -176,6 +203,7 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
     try {
         // O campo relatorio_alunos já é o ARRAY que queremos.
         if (!relatorio_alunos || relatorio_alunos.length === 0) {
+            // Este é o erro que estava sendo ativado, porque o valor passado era undefined.
             throw new Error("O relatório de alunos está vazio ou em formato inválido.");
         }
         
