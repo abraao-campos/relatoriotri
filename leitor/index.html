@@ -35,7 +35,7 @@
         input[type="text"]:disabled { background-color: #e9ecef; color: #6c757d; }
         #gabarito-preview {
             max-width: 100%;
-            max-height: 400px;
+            max-height: 500px; /* Aumentado para melhor visualização */
             margin-top: 15px;
             border: 1px solid #ddd;
             display: none;
@@ -92,7 +92,7 @@
 
         <div id="config-section">
             <h3>1. Configuração da Prova</h3>
-            <p>Informe a estrutura do gabarito que será enviado. **O modelo de gabarito impresso deve ter 4 marcas de referência nos cantos.**</p>
+            <p>Informe a estrutura da prova. Use o modelo de gabarito com 4 marcas de referência (Quadrados Pretos).</p>
             <input type="number" id="num-questoes" placeholder="Número de Questões (Ex: 50)" min="1" required>
             <input type="number" id="num-alternativas" placeholder="Número de Alternativas (Ex: 5)" min="2" max="5" required>
             <input type="number" id="num-pontos-referencia" value="4" disabled style="background-color: #f0f0f0;" title="O modelo de gabarito usa 4 pontos de referência fixos." required>
@@ -116,7 +116,7 @@
             <input type="text" id="aluno-input" placeholder="Nome Completo do Aluno" required>
 
             <input type="file" id="gabarito-input" accept="image/*">
-            <img id="gabarito-preview" alt="Pré-visualização do Gabarito">
+            <img id="gabarito-preview" alt="Pré-visualização do Gabarito" style="border: 2px solid #dc3545;">
 
             <div class="button-group">
                 <button id="processar-gabarito" disabled>Processar Gabarito</button>
@@ -179,10 +179,7 @@
             }
         }
         
-        // --------------------------------------------------------
-        // B. LÓGICA DE CONFIGURAÇÃO (Mantida do passo anterior)
-        // --------------------------------------------------------
-        
+        // ... (Seções B e C - Configuração e Fluxo de Leitura - Mantidas) ...
         numQuestoesInput.addEventListener('input', validarConfig);
         numAlternativasInput.addEventListener('input', validarConfig);
         turmaInput.addEventListener('input', validarConfig);
@@ -256,10 +253,7 @@
             resultadoDiv.style.display = 'block';
         });
 
-        // --------------------------------------------------------
-        // C. LÓGICA DE LEITURA (Mantida do passo anterior)
-        // --------------------------------------------------------
-
+        // Lógica de Leitura (com pequena atualização na validação)
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
             if (file) {
@@ -305,6 +299,7 @@
             resultadoDiv.textContent = `Processando gabarito de ${aluno} (${turma}) com Visão Computacional...`;
             
             try {
+                // >> CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM <<
                 const respostasAluno = await processarImagemOpenCV(gabaritoParaProcessar); 
                 
                 const dadosDoAluno = {
@@ -317,13 +312,16 @@
                 // Reseta e Atualiza a Interface
                 alunoInput.value = '';
                 gabaritoInput.value = '';
-                gabaritoPreview.style.display = 'none';
+                // NÃO ESCONDE O PREVIEW PARA DEPURAR A IMAGEM CORRIGIDA
                 gabaritoParaProcessar = null;
 
                 processarBtn.disabled = true;
                 encerrarBtn.disabled = false;
                 alunosCountSpan.textContent = dadosGabaritos.length;
-                resultadoDiv.textContent = `✅ Gabarito de ${aluno} processado! Total de alunos: ${dadosGabaritos.length}. Envie o próximo ou Encerrar.`;
+                
+                // Exibe as respostas lidas para depuração
+                const respostasLidas = Object.entries(respostasAluno).map(([q, r]) => `${q}: ${r}`).join(', ');
+                resultadoDiv.innerHTML = `✅ Gabarito de <strong>${aluno}</strong> processado! Total: ${dadosGabaritos.length}. <br> Respostas lidas (Q1-Q${NUM_QUESTOES}): ${respostasLidas}. Envie o próximo ou Encerrar.`;
                 resultadoDiv.style.backgroundColor = '#d4edda';
                 resultadoDiv.style.borderColor = '#c3e6cb';
                 resultadoDiv.style.color = '#155724';
@@ -340,11 +338,12 @@
         
         
         // --------------------------------------------------------
-        // D. FUNÇÃO DE VISÃO COMPUTACIONAL (LÓGICA INICIAL REAL)
+        // D. FUNÇÃO DE VISÃO COMPUTACIONAL (LÓGICA AJUSTADA PARA CALIBRAÇÃO)
         // --------------------------------------------------------
         
-        const OUTPUT_WIDTH = 500; // Largura padronizada para a imagem corrigida
-        const OUTPUT_HEIGHT = 800; // Altura padronizada (Exemplo para um gabarito de 50Q, 2 Colunas)
+        // DIMENSÕES FIXAS DA IMAGEM APÓS A CORREÇÃO DE PERSPECTIVA
+        const OUTPUT_WIDTH = 600; // Calibrado para imagem de tamanho A4 (vertical)
+        const OUTPUT_HEIGHT = 850; 
 
         async function processarImagemOpenCV(imageDataURL) {
             
@@ -373,13 +372,15 @@
             
             // 3.1. Thresholding para isolar as marcas pretas (escuras)
             cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+            // Inverte o limiar: tudo que é mais escuro que 50 vira branco (255), o resto vira preto (0)
             cv.threshold(blurred, thresh, 50, 255, cv.THRESH_BINARY_INV);
             
             // 3.2. Encontrar Contornos
             cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
             let biggestContours = [];
-            let minAreaThreshold = 100; // Ajustar conforme a resolução da imagem
+            // Aumentado para 500, assumindo que as marcas de referência são grandes
+            let minAreaThreshold = 500; 
             
             // Filtra os 4 maiores contornos que são suficientemente grandes (as marcas de referência)
             for (let i = 0; i < contours.size(); ++i) {
@@ -392,11 +393,16 @@
             
             // Ordenar por área e pegar os 4 maiores (os 4 pontos de referência)
             biggestContours.sort((a, b) => b.area - a.area);
+            
+            // Limpa contornos extras antes de prosseguir
+            for(let i = 4; i < biggestContours.length; i++) {
+                biggestContours[i].contour.delete();
+            }
 
             if (biggestContours.length < 4) {
                  // Limpeza de memória antes de lançar o erro
                  src.delete(); gray.delete(); blurred.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
-                 throw new Error("Não foi possível detectar as 4 marcas de referência na imagem. Tente tirar uma foto mais alinhada.");
+                 throw new Error(`Não foi possível detectar as 4 marcas de referência (apenas ${biggestContours.length} encontradas). Ajuste a iluminação, contraste ou tente tirar a foto mais de perto. **Área Mínima: ${minAreaThreshold}**`);
             }
             
             // 3.3. Obter os 4 pontos de referência (os centroides dos 4 maiores contornos)
@@ -406,6 +412,7 @@
                 let cX = M.m10 / M.m00;
                 let cY = M.m01 / M.m00;
                 refPoints.push({ x: cX, y: cY });
+                biggestContours[i].contour.delete(); // Limpa o contorno
             }
             
             // 3.4. Ordenar os pontos para garantir a ordem (Top-Left, Top-Right, Bottom-Right, Bottom-Left)
@@ -416,10 +423,10 @@
             bottomPoints.sort((a, b) => a.x - b.x); 
             
             const orderedPoints = [
-                topPoints[0],      // Top-Left
-                topPoints[1],      // Top-Right
-                bottomPoints[1],   // Bottom-Right
-                bottomPoints[0]    // Bottom-Left
+                topPoints[0],      // Top-Left (TL)
+                topPoints[1],      // Top-Right (TR)
+                bottomPoints[1],   // Bottom-Right (BR)
+                bottomPoints[0]    // Bottom-Left (BL)
             ];
             
             // 3.5. Correção de Perspectiva (Warpping)
@@ -442,163 +449,16 @@
             let warped = new cv.Mat();
             cv.warpPerspective(gray, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
             
-            // ***DEBUG: Para ver a imagem corrigida***
-            // cv.imshow('process-canvas', warped); // Substitui a imagem no canvas oculto
+            // ***PASSO CRUCIAL PARA CALIBRAÇÃO: EXIBE A IMAGEM CORRIGIDA***
+            cv.imshow('process-canvas', warped); 
+            gabaritoPreview.src = processCanvas.toDataURL(); // Exibe a imagem corrigida no preview principal
+            gabaritoPreview.style.borderColor = '#28a745'; // Borda verde para sucesso na correção
 
             // 4. LEITURA DE MARCAÇÕES (Detecção de Bolhas)
-            
+
             // 4.1. Configurações de Leitura
             const respostas = {};
             const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
             
-            // A largura de cada coluna de resposta (Ex: 2 colunas para 500px de largura)
-            const COL_WIDTH = OUTPUT_WIDTH / 2; 
-            // Altura de cada questão (Ex: 25 questões por coluna para 800px de altura)
-            const ROW_HEIGHT = OUTPUT_HEIGHT / (NUM_QUESTOES / 2); 
-            
-            // Limiar para determinar se uma bolha está preenchida (será usado no loop)
-            let THRESHOLD_FILL = 150; // Pixels mais escuros que 150 serão considerados preenchidos (preto é 0, branco é 255)
-
-            // 4.2. Iterar sobre cada Questão e Alternativa (Bolhas)
-            for (let q = 0; q < NUM_QUESTOES; q++) {
-                
-                // Determina a coluna (0 para Q1-Q25, 1 para Q26-Q50)
-                const col = q < NUM_QUESTOES / 2 ? 0 : 1;
-                // Determina o índice da linha na coluna
-                const row = q % (NUM_QUESTOES / 2); 
-                
-                let maiorEscuridao = 255; // Branco
-                let respostaAluno = 'X'; // 'X' para não marcado ou duplo marcado
-                
-                // Mapeamento de coordenadas (precisa ser calibrado no modelo real)
-                // Assumindo que a área da questão é um retângulo
-                const x_start = col * COL_WIDTH;
-                const y_start = row * ROW_HEIGHT;
-                const x_end = (col + 1) * COL_WIDTH;
-                const y_end = (row + 1) * ROW_HEIGHT;
-                
-                // ROI (Região de Interesse) da questão
-                let rect = new cv.Rect(x_start, y_start, COL_WIDTH, ROW_HEIGHT);
-                let questionROI = warped.roi(rect);
-                
-                // AQUI ENTRA A LÓGICA DE DETECÇÃO DE BOLHAS:
-                // No modelo ideal, você sabe a posição X exata de cada bolha A, B, C, D, E dentro da questionROI.
-                // O código deveria iterar sobre essas 5 posições de bolha:
-                
-                let foundMarking = false;
-                const bolhaWidth = COL_WIDTH / (NUM_ALTERNATIVAS + 1); // Largura aproximada de cada bolha
-                
-                for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
-                    // Coordenada X da bolha 'a' dentro da questionROI (EXEMPLO CONCEPTUAL)
-                    const bolhaX = bolhaWidth * (a + 1); 
-                    
-                    // Exemplo: Recortar a área da bolha para análise
-                    let bolhaRect = new cv.Rect(bolhaX - 10, questionROI.rows / 2 - 10, 20, 20); // Ajustar tamanho
-                    let bubbleROI = questionROI.roi(bolhaRect);
-                    
-                    // Média de Escuridão (Valor mais baixo = mais escuro)
-                    let mediaCor = cv.mean(bubbleROI)[0]; 
-                    
-                    if (mediaCor < maiorEscuridao) {
-                        maiorEscuridao = mediaCor;
-                        respostaAluno = alternativas[a];
-                    }
-                    
-                    bubbleROI.delete();
-                }
-                
-                questionROI.delete();
-                
-                // Regra de Decisão Final: Se a bolha mais escura ainda for muito clara, considera-se em branco.
-                if (maiorEscuridao > THRESHOLD_FILL) {
-                    respostaAluno = 'B'; // 'B' = Branco/Não marcado (Usando a convenção do seu CSV para nulo)
-                }
-
-                // Armazenar a resposta (Q1, Q2, etc.)
-                respostas[`Q${q + 1}`] = respostaAluno;
-            }
-
-            // 5. Cleanup
-            src.delete(); gray.delete(); blurred.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
-            warped.delete(); M.delete(); srcTri.delete(); dstTri.delete();
-            
-            return respostas; 
-        }
-
-        // --------------------------------------------------------
-        // E. LÓGICA DE ENCERRAMENTO (Mantida do passo anterior)
-        // --------------------------------------------------------
-
-        encerrarBtn.addEventListener('click', function() {
-            if (dadosGabaritos.length === 0) {
-                 resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
-                 return;
-            }
-            
-            gerarDownloadCSV(); 
-            
-            dadosGabaritos = [];
-            gabaritoOficialRespostas = [];
-            NUM_QUESTOES = 0;
-            NUM_ALTERNATIVAS = 0;
-            
-            turmaInput.disabled = false;
-            turmaInput.value = '';
-            alunoInput.value = '';
-            alunosCountSpan.textContent = '0';
-            encerrarBtn.disabled = true;
-            processarBtn.disabled = true;
-            gabaritoRespostasArea.innerHTML = '';
-            
-            gabaritoOficialSection.style.display = 'none';
-            inputSection.style.display = 'none';
-            configSection.style.display = 'block';
-            
-            resultadoDiv.textContent = "🎉 CSV Gerado com sucesso! Aplicação reiniciada para uma nova turma.";
-            resultadoDiv.style.backgroundColor = '#fff3cd';
-            resultadoDiv.style.borderColor = '#ffeeba';
-            resultadoDiv.style.color = '#856404';
-        });
-        
-        
-        function gerarDownloadCSV() {
-            const gabaritoOficialData = { "Aluno": "Gabarito Oficial" };
-            for (let i = 1; i <= NUM_QUESTOES; i++) {
-                gabaritoOficialData[`Q${i}`] = gabaritoOficialRespostas[i-1];
-            }
-            
-            const dadosParaCSV = [gabaritoOficialData, ...dadosGabaritos];
-            
-            const separador = ';';
-            const headers = Object.keys(dadosParaCSV[0]); 
-            
-            let csvString = headers.join(separador) + '\n';
-            
-            dadosParaCSV.forEach(row => {
-                const values = headers.map(header => {
-                    let value = row[header] !== undefined ? String(row[header]) : '';
-                    return `"${value.replace(/"/g, '""')}"`;
-                });
-                csvString += values.join(separador) + '\n';
-            });
-            
-            const turmaNome = turmaInput.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
-            const data = new Date().toISOString().slice(0, 10);
-            const filename = `Gabaritos_${turmaNome}_${data}.csv`;
-
-            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        }
-    </script>
-</body>
-</html>
+            // Calibração dos Espaços (Baseado no modelo de 2 colunas)
+            const NUM_COLS = 2; //
