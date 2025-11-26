@@ -21,11 +21,10 @@
             max-width: 600px;
             width: 100%;
             text-align: center;
+            margin-bottom: 20px;
         }
-        h1 {
-            color: #333;
-        }
-        input[type="file"], input[type="text"] {
+        h1 { color: #333; }
+        input[type="file"], input[type="text"], input[type="number"] {
             margin: 10px 0;
             padding: 12px;
             border: 1px solid #ccc;
@@ -52,13 +51,9 @@
             color: #007bff;
             border-radius: 5px;
             display: none;
+            text-align: left;
         }
-        .button-group {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+        .button-group { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
         button {
             padding: 12px 20px;
             border: none;
@@ -67,47 +62,72 @@
             font-size: 1em;
             transition: background-color 0.3s;
         }
-        #processar-gabarito {
-            background-color: #28a745;
-            color: white;
+        #btn-definir-gabarito { background-color: #007bff; color: white; }
+        #btn-definir-gabarito:hover { background-color: #0056b3; }
+        #processar-gabarito { background-color: #28a745; color: white; }
+        #processar-gabarito:hover { background-color: #1e7e34; }
+        #encerrar-gabaritos { background-color: #dc3545; color: white; width: 100%; margin-top: 30px; }
+        #encerrar-gabaritos:hover { background-color: #c82333; }
+        #encerrar-gabaritos:disabled, button:disabled { background-color: #f4f4f9; color: #6c757d; cursor: not-allowed; }
+
+        /* Estilos para as Seções */
+        #config-section, #input-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: left;
         }
-        #processar-gabarito:hover {
-            background-color: #1e7e34;
-        }
-        #encerrar-gabaritos {
-            background-color: #dc3545;
-            color: white;
-            width: 100%;
-            margin-top: 30px;
-        }
-        #encerrar-gabaritos:hover {
-            background-color: #c82333;
-        }
-        #encerrar-gabaritos:disabled {
-            background-color: #f4f4f9;
-            color: #6c757d;
-            cursor: not-allowed;
+        #input-section { display: none; }
+        #gabarito-respostas-area {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📸 Leitor de Gabaritos</h1>
-        <p>Preencha os dados e envie a foto do gabarito.</p>
 
-        <input type="text" id="turma-input" placeholder="Turma (Ex: 8A, 3º Ano B)" required>
-        <input type="text" id="aluno-input" placeholder="Nome Completo do Aluno" required>
+        <div id="config-section">
+            <h3>1. Configuração da Prova</h3>
+            <p>Informe a estrutura do gabarito que será enviado.</p>
+            <input type="number" id="num-questoes" placeholder="Número de Questões (Ex: 50)" min="1" required>
+            <input type="number" id="num-alternativas" placeholder="Número de Alternativas (Ex: 5)" min="2" max="5" required>
+            
+            <input type="text" id="turma-input" placeholder="Turma (Ex: 8A, 3º Ano B)" required>
 
-        <input type="file" id="gabarito-input" accept="image/*">
-        <img id="gabarito-preview" alt="Pré-visualização do Gabarito">
-
-        <div class="button-group">
-            <button id="processar-gabarito" disabled>Processar Gabarito</button>
+            <button id="btn-definir-estrutura" disabled style="width: 100%; margin-top: 15px;">Definir Estrutura</button>
         </div>
 
-        <div id="resultado">Aguardando envio da imagem...</div>
+        <div id="gabarito-oficial-section" style="display: none; margin-bottom: 20px;">
+             <h3>2. Gabarito Oficial</h3>
+             <p>Preencha as respostas corretas. Use A, B, C, D, E, etc.</p>
+             <div id="gabarito-respostas-area">
+                </div>
+             <button id="btn-iniciar-leitura" disabled style="width: 100%; margin-top: 15px; background-color: #28a745;">Iniciar Leitura dos Alunos</button>
+        </div>
 
-        <button id="encerrar-gabaritos" disabled>Encerrar Gabaritos da Turma (Gerar CSV)</button>
+        <div id="input-section">
+            <h3>3. Leitura dos Gabaritos</h3>
+            
+            <input type="text" id="aluno-input" placeholder="Nome Completo do Aluno" required>
+
+            <input type="file" id="gabarito-input" accept="image/*">
+            <img id="gabarito-preview" alt="Pré-visualização do Gabarito">
+
+            <div class="button-group">
+                <button id="processar-gabarito" disabled>Processar Gabarito</button>
+            </div>
+            
+            <div id="resultado">Aguardando definição do Gabarito Oficial...</div>
+            
+            <p style="margin-top: 15px; text-align: center; color: #6c757d;">Alunos processados: <span id="alunos-count">0</span></p>
+
+            <button id="encerrar-gabaritos" disabled>Encerrar Gabaritos da Turma (Gerar CSV)</button>
+        </div>
     </div>
 
     <a href="https://relatoriotri.vercel.app/" style="margin-top: 20px; display: inline-block;">↩️ Voltar para a Página de Análise de Resultados</a>
@@ -120,12 +140,116 @@
         const resultadoDiv = document.getElementById('resultado');
         const processarBtn = document.getElementById('processar-gabarito');
         const encerrarBtn = document.getElementById('encerrar-gabaritos');
+        const alunosCountSpan = document.getElementById('alunos-count');
+        
+        // Novos elementos de configuração
+        const numQuestoesInput = document.getElementById('num-questoes');
+        const numAlternativasInput = document.getElementById('num-alternativas');
+        const definirEstruturaBtn = document.getElementById('btn-definir-estrutura');
+        const configSection = document.getElementById('config-section');
+        const gabaritoOficialSection = document.getElementById('gabarito-oficial-section');
+        const gabaritoRespostasArea = document.getElementById('gabarito-respostas-area');
+        const iniciarLeituraBtn = document.getElementById('btn-iniciar-leitura');
+        const inputSection = document.getElementById('input-section');
 
-        // Array para armazenar os dados de todos os alunos processados
+        // Variáveis de Estado
         let dadosGabaritos = [];
         let gabaritoParaProcessar = null;
+        let gabaritoOficialRespostas = [];
+        let NUM_QUESTOES = 0;
+        let NUM_ALTERNATIVAS = 0;
 
-        // 1. Lógica de Validação e Pré-visualização da Imagem
+        // --------------------------------------------------------
+        // A. LÓGICA DE CONFIGURAÇÃO (PASSO 1)
+        // --------------------------------------------------------
+        
+        // Habilita o botão Definir Estrutura
+        numQuestoesInput.addEventListener('input', validarConfig);
+        numAlternativasInput.addEventListener('input', validarConfig);
+        turmaInput.addEventListener('input', validarConfig);
+        
+        function validarConfig() {
+            const numQ = parseInt(numQuestoesInput.value);
+            const numA = parseInt(numAlternativasInput.value);
+            const turmaValida = turmaInput.value.trim() !== '';
+            
+            if (numQ >= 1 && numA >= 2 && numA <= 5 && turmaValida) {
+                definirEstruturaBtn.disabled = false;
+            } else {
+                definirEstruturaBtn.disabled = true;
+            }
+        }
+
+        // Ação: Definir Estrutura
+        definirEstruturaBtn.addEventListener('click', function() {
+            NUM_QUESTOES = parseInt(numQuestoesInput.value);
+            NUM_ALTERNATIVAS = parseInt(numAlternativasInput.value);
+            
+            // Inicia o preenchimento das respostas do gabarito oficial
+            renderizarInputsGabaritoOficial();
+            
+            // Alterna a visualização
+            configSection.style.display = 'none';
+            gabaritoOficialSection.style.display = 'block';
+        });
+
+        // Injeção dinâmica dos campos de resposta oficial
+        function renderizarInputsGabaritoOficial() {
+            gabaritoRespostasArea.innerHTML = '';
+            
+            // Determina as letras das alternativas (A, B, C, D, E)
+            const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
+
+            for (let i = 1; i <= NUM_QUESTOES; i++) {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label for="q${i}" style="font-weight: bold;">Q${i}:</label>
+                    <select id="q${i}" required style="width: 100%; padding: 8px;">
+                        <option value="">--</option>
+                        ${alternativas.map(alt => `<option value="${alt}">${alt}</option>`).join('')}
+                    </select>
+                `;
+                gabaritoRespostasArea.appendChild(div);
+            }
+            
+            // Adiciona listener para validar o preenchimento
+            gabaritoRespostasArea.addEventListener('change', validarGabaritoOficial);
+            validarGabaritoOficial(); // Checagem inicial
+        }
+        
+        function validarGabaritoOficial() {
+            const selects = gabaritoRespostasArea.querySelectorAll('select');
+            let preenchido = true;
+            selects.forEach(select => {
+                if (select.value === "") {
+                    preenchido = false;
+                }
+            });
+            iniciarLeituraBtn.disabled = !preenchido;
+            resultadoDiv.textContent = "Preencha todas as respostas corretas para iniciar a leitura dos alunos.";
+        }
+
+        // Ação: Iniciar Leitura (Guarda o Gabarito Oficial e Abre a Seção de Leitura)
+        iniciarLeituraBtn.addEventListener('click', function() {
+            gabaritoOficialRespostas = [];
+            const selects = gabaritoRespostasArea.querySelectorAll('select');
+            selects.forEach(select => {
+                gabaritoOficialRespostas.push(select.value);
+            });
+            
+            // Bloqueia a turma e inicia a interface de leitura
+            turmaInput.disabled = true;
+            gabaritoOficialSection.style.display = 'none';
+            inputSection.style.display = 'block';
+            resultadoDiv.textContent = `Gabarito Oficial (Q1-Q${NUM_QUESTOES}) definido. Turma ${turmaInput.value} travada. Pronto para a leitura do primeiro aluno.`;
+            resultadoDiv.style.display = 'block';
+        });
+        
+        // --------------------------------------------------------
+        // B. LÓGICA DE LEITURA (PASSO 2)
+        // --------------------------------------------------------
+
+        // Lógica de Pré-visualização e Habilitação
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
             if (file) {
@@ -133,172 +257,26 @@
                 reader.onload = function(e) {
                     gabaritoPreview.src = e.target.result;
                     gabaritoPreview.style.display = 'block';
-                    // Armazena a URL da imagem (base64) para processamento
                     gabaritoParaProcessar = e.target.result; 
-                    
-                    // Habilita o botão de processamento se todos os campos estiverem OK
-                    validarFormulario();
-                    resultadoDiv.textContent = "Imagem carregada. Preencha os dados e clique em 'Processar Gabarito'.";
+                    validarFormularioAluno();
                 }
                 reader.readAsDataURL(file);
             } else {
                 gabaritoPreview.style.display = 'none';
                 gabaritoParaProcessar = null;
-                validarFormulario();
+                validarFormularioAluno();
             }
         });
         
-        // Habilita/Desabilita o botão de processamento com base nos campos
-        turmaInput.addEventListener('input', validarFormulario);
-        alunoInput.addEventListener('input', validarFormulario);
+        alunoInput.addEventListener('input', validarFormularioAluno);
 
-        function validarFormulario() {
-            const turmaValida = turmaInput.value.trim() !== '';
+        function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
-            
-            // Requer todos os campos + uma imagem carregada
-            if (turmaValida && alunoValido && gabaritoParaProcessar) {
+            if (alunoValido && gabaritoParaProcessar) {
                 processarBtn.disabled = false;
             } else {
                 processarBtn.disabled = true;
             }
         }
 
-
-        // 2. Lógica de Processamento (Chamada quando o botão é clicado)
-        processarBtn.addEventListener('click', function() {
-            // Desabilita os botões para evitar cliques duplos
-            processarBtn.disabled = true;
-            encerrarBtn.disabled = true; 
-            
-            const turma = turmaInput.value.trim();
-            const aluno = alunoInput.value.trim();
-
-            if (!turma || !aluno || !gabaritoParaProcessar) {
-                 resultadoDiv.textContent = "Erro: Por favor, preencha todos os campos e envie a imagem.";
-                 processarBtn.disabled = false;
-                 return;
-            }
-            
-            resultadoDiv.textContent = `Processando gabarito de ${aluno} (${turma})...`;
-            
-            // >> CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM <<
-            // Esta função será o foco do nosso próximo desenvolvimento
-            const dadosDoAluno = simularProcessamentoImagem(aluno); 
-            
-            // Adiciona a turma e o nome ao resultado final
-            dadosDoAluno.Turma = turma; // Adiciona a turma para o CSV final
-            
-            // Armazena os dados
-            dadosGabaritos.push(dadosDoAluno);
-
-            // Reseta e Atualiza a Interface
-            turmaInput.disabled = true; // Bloqueia a turma para o restante da classe
-            alunoInput.value = ''; // Limpa o nome do aluno
-            gabaritoInput.value = ''; // Limpa o arquivo (necessário para re-upload do mesmo nome)
-            gabaritoPreview.style.display = 'none';
-            gabaritoParaProcessar = null;
-
-            processarBtn.disabled = true;
-            encerrarBtn.disabled = false; // Habilita o encerramento após o 1º aluno
-            resultadoDiv.textContent = `✅ Gabarito de ${aluno} processado! Total de alunos: ${dadosGabaritos.length}. Envie o próximo ou Encerrar.`;
-        });
-        
-        
-        // 3. Funções Placeholder para desenvolvimento
-        
-        // **ESTA FUNÇÃO SERÁ A MAIS IMPORTANTE E MAIS COMPLEXA**
-        // Por enquanto, ela retorna dados simulados.
-        function simularProcessamentoImagem(aluno) {
-            // Simulação do resultado da leitura de imagem (Acertos e Respostas)
-            // Lembre-se, o CSV final exige as respostas das questões
-            // Exemplo: "Aluno";"Q1";"Q2";"Q3"
-            
-            const respostasSimuladas = {
-                // Aqui entraria a lógica que lê a imagem e retorna o array de respostas
-                "Aluno": aluno,
-                "Q1": "A",
-                "Q2": "B",
-                "Q3": "C",
-                "Q4": "A",
-                "Q5": "X" // X = Não Marcou ou Marcou Errado/Nulo
-            };
-            return respostasSimuladas;
-        }
-
-        // 4. Lógica de Encerramento (Geração e Download do CSV)
-        encerrarBtn.addEventListener('click', function() {
-            if (dadosGabaritos.length === 0) {
-                 resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
-                 return;
-            }
-            
-            // >> CHAMA A FUNÇÃO DE GERAÇÃO E DOWNLOAD CSV <<
-            gerarDownloadCSV(); 
-            
-            // Reseta a aplicação para uma nova turma
-            dadosGabaritos = [];
-            turmaInput.disabled = false;
-            turmaInput.value = '';
-            encerrarBtn.disabled = true;
-            resultadoDiv.textContent = "🎉 CSV Gerado! Aplicação reiniciada para uma nova turma.";
-        });
-        
-        
-        // 5. Função de Geração e Download do CSV
-        function gerarDownloadCSV() {
-            // Lembre-se que precisamos do GABARITO OFICIAL como a primeira linha do CSV!
-            
-            // ATENÇÃO: É NECESSÁRIO SABER AS RESPOSTAS DO GABARITO OFICIAL
-            // A solução mais robusta é pedir ao usuário o Gabarito Oficial uma vez.
-            
-            // Por enquanto, vamos assumir um gabarito de 5 questões:
-            const gabaritoOficial = {
-                "Aluno": "Gabarito Oficial",
-                "Q1": "A",
-                "Q2": "B",
-                "Q3": "C",
-                "Q4": "D",
-                "Q5": "E"
-            };
-            
-            const dadosParaCSV = [gabaritoOficial, ...dadosGabaritos];
-            
-            // --- Lógica de Criação de String CSV ---
-            const separador = ';'; // Usaremos ponto e vírgula como padrão
-            const headers = Object.keys(dadosParaCSV[0]); // Pega todas as chaves (Aluno, Q1, Q2...)
-            
-            let csvString = headers.join(separador) + '\n';
-            
-            dadosParaCSV.forEach(row => {
-                const values = headers.map(header => {
-                    // Garante que o valor está entre aspas se contiver o separador (boa prática)
-                    let value = row[header] !== undefined ? String(row[header]) : '';
-                    return `"${value.replace(/"/g, '""')}"`; // Escape aspas duplas e envolve em aspas
-                });
-                csvString += values.join(separador) + '\n';
-            });
-            
-            // --- Download ---
-            const turmaNome = turmaInput.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
-            const data = new Date().toISOString().slice(0, 10);
-            const filename = `Gabaritos_${turmaNome}_${data}.csv`;
-
-            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-            // --- Fim do Download ---
-        }
-
-    </script>
-</body>
-</html>
+        // Ação: Processar Gabarito (Chamada quando o botão
