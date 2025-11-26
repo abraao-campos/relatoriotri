@@ -48,6 +48,7 @@
             color: #007bff;
             border-radius: 5px;
             text-align: left;
+            transition: background-color 0.3s; /* Adicionado para efeito visual */
         }
         .button-group { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
         button {
@@ -295,7 +296,7 @@
 
         // --- C. LÓGICA DE INPUT E VALIDAÇÃO ---
         
-        // Novo listener de input que apenas mostra a prévia e valida o formulário
+        // Novo listener forçando a revalidação com setTimeout
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
             if (file) {
@@ -304,35 +305,37 @@
                     gabaritoPreview.src = e.target.result;
                     gabaritoPreview.style.display = 'block';
                 }
-                // Lê como URL para a pré-visualização, mas NÃO preenche o Base64 globalmente
                 reader.readAsDataURL(file); 
             } else {
                 gabaritoPreview.style.display = 'none';
             }
-            validarFormularioAluno(); // VALIDAÇÃO APÓS SELEÇÃO DO ARQUIVO
+            
+            // CHAMADA CRÍTICA: Força a revalidação com um pequeno atraso (50ms)
+            setTimeout(validarFormularioAluno, 50); 
         });
         
         alunoInput.addEventListener('input', validarFormularioAluno);
 
-        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (VERSÃO FINAL SIMPLIFICADA)
+        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (MAIS SIMPLIFICADA)
         function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
-            
-            // Checa apenas se um arquivo foi SELECIONADO no input FILE
             const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
 
-            const confirmacaoVisivel = leituraConfirmacaoDiv.style.display !== 'none';
-            const podeProcessar = alunoValido && imagemSelecionada && !confirmacaoVisivel;
+            const podeProcessar = alunoValido && imagemSelecionada && (leituraConfirmacaoDiv.style.display === 'none'); 
             
-            resultadoDiv.style.display = 'block'; // Garante que a div está visível
+            resultadoDiv.style.display = 'block'; 
             
+            if (leituraConfirmacaoDiv.style.display !== 'none') {
+                return; // Não altera o status durante a confirmação
+            }
+
             if (podeProcessar) {
                  // Estado de OK para processar
                  resultadoDiv.textContent = `✅ Pronto para processar gabarito de ${alunoInput.value.trim()} (Total: ${dadosGabaritos.length}). Clique no botão verde.`;
                  resultadoDiv.style.backgroundColor = '#d4edda'; // Verde claro
                  resultadoDiv.style.borderColor = '#c3e6cb';
                  resultadoDiv.style.color = '#155724';
-            } else if (!confirmacaoVisivel) {
+            } else {
                 // Estado de BLOQUEIO (motivo)
                 let statusMsg = "🚧 Botão desabilitado. Motivo: ";
                 if (!alunoValido) statusMsg += "1. Nome do aluno ausente/inválido. ";
@@ -344,14 +347,11 @@
                 resultadoDiv.style.color = '#856404'; // Amarelo para aviso
             }
 
-            if (podeProcessar) { 
-                processarBtn.disabled = false;
-            } else {
-                processarBtn.disabled = true;
-            }
+            // Ação principal: Habilitar ou desabilitar
+            processarBtn.disabled = !podeProcessar;
         }
 
-        // LÓGICA DE PROCESSAMENTO (AGORA INCLUINDO A CONVERSÃO DE ARQUIVO)
+        // LÓGICA DE PROCESSAMENTO (INCLUINDO A CONVERSÃO DE ARQUIVO)
         processarBtn.addEventListener('click', async function() {
             processarBtn.disabled = true;
             encerrarBtn.disabled = true; 
@@ -367,6 +367,8 @@
             }
             
             resultadoDiv.textContent = `Processando gabarito de ${alunoEmProcessamento} (${turma}). Lendo arquivo e convertendo para Base64...`;
+            resultadoDiv.style.backgroundColor = '#e9f5ff';
+            resultadoDiv.style.color = '#007bff';
             
             try {
                 // PASSO CRÍTICO: CHAMA A FUNÇÃO PROMISE PARA LER O ARQUIVO AGORA
@@ -492,7 +494,6 @@
             respostasTemporarias = {};
             gabaritoInput.value = '';
             
-            // O Base64 não é mais uma variável global, então apenas resetamos o preview
             gabaritoPreview.style.display = 'none'; 
             
             alunoInput.disabled = false;
