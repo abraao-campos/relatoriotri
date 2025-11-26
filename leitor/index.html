@@ -139,7 +139,7 @@
             <img id="gabarito-preview" alt="Pré-visualização do Gabarito" style="border: 2px solid #ddd;">
 
             <div class="button-group">
-                <button id="processar-gabarito">Processar Gabarito (Via IA)</button>
+                <button id="processar-gabarito" disabled>Processar Gabarito (Via IA)</button>
             </div>
             
             <div id="resultado">Pronto para a leitura por Inteligência Artificial.</div>
@@ -200,7 +200,6 @@
         let respostasTemporarias = {};
 
         // --- B. CONFIGURAÇÃO E DEFINIÇÃO DO GABARITO OFICIAL ---
-        // ... (Mesmas funções: validarConfig, definirEstruturaBtn, renderizarInputsGabaritoOficial, validarGabaritoOficial) ...
         numQuestoesInput.addEventListener('input', validarConfig);
         numAlternativasInput.addEventListener('input', validarConfig);
         turmaInput.addEventListener('input', validarConfig);
@@ -297,6 +296,7 @@
 
         function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
+            // Só permite processar se houver nome, imagem E não estiver na tela de confirmação
             if (alunoValido && gabaritoParaProcessar && leituraConfirmacaoDiv.style.display === 'none') { 
                 processarBtn.disabled = false;
             } else {
@@ -342,7 +342,7 @@
 
                 respostasTemporarias = data.respostas;
                 
-                // Validação mínima para garantir que o resultado é um objeto com as respostas
+                // Validação mínima 
                 if (typeof respostasTemporarias !== 'object' || Object.keys(respostasTemporarias).length !== NUM_QUESTOES) {
                      throw new Error(`A IA retornou um número incorreto de questões (${Object.keys(respostasTemporarias).length} de ${NUM_QUESTOES}).`);
                 }
@@ -357,6 +357,7 @@
                 resultadoDiv.style.borderColor = '#f5c6cb';
                 resultadoDiv.style.color = '#721c24';
                 processarBtn.disabled = false;
+                encerrarBtn.disabled = dadosGabaritos.length === 0; // Reabilita o Encerrar se já houver dados
             }
         });
         
@@ -368,7 +369,7 @@
             gabaritoInput.disabled = true;
             processarBtn.style.display = 'none';
 
-            // Formata as respostas em 4 colunas
+            // Formata as respostas em 4 colunas para visualização
             const respostasLidas = Object.entries(respostas);
             let respostasFormatadas = '';
             for (let i = 0; i < respostasLidas.length; i++) {
@@ -435,13 +436,12 @@
             gabaritoInput.disabled = false;
             
             processarBtn.style.display = 'block';
-            processarBtn.disabled = false;
 
             leituraConfirmacaoDiv.style.display = 'none';
             validarFormularioAluno(); // Revalida o estado dos botões
         }
 
-        // --- E. GERAÇÃO DE CSV E ENCERRAMENTO (Mantida) ---
+        // --- E. GERAÇÃO DE CSV E ENCERRAMENTO ---
         encerrarBtn.addEventListener('click', function() {
             if (dadosGabaritos.length === 0) {
                  resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
@@ -513,6 +513,10 @@
                 document.body.removeChild(link);
             }
         }
+
+        // --- INICIALIZAÇÃO DE ESTADO (CORREÇÃO) ---
+        // Garante que o estado inicial do botão "Processar" seja definido corretamente.
+        validarFormularioAluno(); 
     </script>
 </body>
 </html>
