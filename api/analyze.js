@@ -46,20 +46,19 @@ module.exports = async (req, res) => {
         }
 
         // --- 2. Chunking e Processamento do Gemini ---
-        // Otimização: Ajusta o chunk size para 35. 
-        // Reduz o payload por requisição, aumentando a velocidade de cada chamada e reduzindo o risco de Timeout (504).
+        // Usamos 35 como um bom meio termo, mas o processamento PARALELO é o fator mais importante.
         const alunoChunks = chunkArray(alunosParaCorrigir, 35); 
-        let relatorioFinalDetalhado = [];
-        let relatoriosObservacoes = [];
         
-        for (let i = 0; i < alunoChunks.length; i++) {
-            const chunk = alunoChunks[i];
+        // ----------------------------------------------------------------------
+        // NOVO: Processamento Paralelo usando Promise.all() (Resolve 504 Timeout)
+        // ----------------------------------------------------------------------
+        const analysisPromises = alunoChunks.map((chunk, i) => {
             const chunkData = [gabaritoOficial, ...chunk];
             const chunkJsonString = JSON.stringify(chunkData, null, 2);
             
             let prompt;
             if (i === 0) {
-                // Prompt completo para o primeiro lote
+                // Prompt completo para o primeiro lote (com análise geral)
                 prompt = `Você é um Analista de Desempenho Escolar.
 Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
 **Instruções de Saída:**
@@ -67,7 +66,7 @@ Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito O
 O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador).
 O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
-3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
+3. **Observações Gerais (Bloco TEXT):** APENAS neste lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
 Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média de Acertos:** [...] **Maior Pontuação:** [...] **Menor Pontuação:** [...] \`\`\`text Observações Gerais: [...] \`\`\`
                 
                 **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
@@ -81,42 +80,56 @@ O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 
                 **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
             }
-            
-            // 3. Chamada à API e Tratamento de Erro (API)
-            let response;
-            try {
-                response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: prompt,
-                    config: {
-                        responseMimeType: 'text/plain', 
-                        temperature: 0.1,
-                    }
-                });
-            } catch (apiError) {
-                throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Verifique sua chave API. Detalhe: ${apiError.message}`);
-            }
 
+            // Retorna a Promessa da chamada à API (ela será executada em paralelo)
+            return (async () => {
+                let response;
+                try {
+                    response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: prompt,
+                        config: {
+                            responseMimeType: 'text/plain', 
+                            temperature: 0.1,
+                        }
+                    });
+                } catch (apiError) {
+                    // Propaga o erro com o índice do lote
+                    throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Detalhe: ${apiError.message}`);
+                }
+                
+                // Retorna o índice e o texto completo para processamento posterior
+                return { 
+                    index: i, 
+                    text: response.text.trim()
+                };
+            })();
+        });
+        
+        // Espera que todas as chamadas à API sejam concluídas em paralelo
+        const allResponses = await Promise.all(analysisPromises);
+        
+        let relatorioFinalDetalhado = [];
+        let relatoriosObservacoes = [];
+        
+        // Processa as respostas
+        // Usamos um for...of para processar na ordem em que foram retornadas
+        for (const { index, text: fullText } of allResponses) {
+            
             // 4. EXTRAÇÃO ROBUSTA E CONCATENAÇÃO
-            const fullText = response.text.trim();
             const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
             
             if (jsonMatch) {
                 let jsonString = jsonMatch[1].trim();
-                // Pega o conteúdo interno e faz um trim inicial
-
-                // Tenta ser mais robusto: isola o conteúdo entre o primeiro '[' e o último ']'
-                // Isso remove qualquer caractere extra que o Gemini possa ter colocado após o JSON
+                
                 const firstBracket = jsonString.indexOf('[');
                 const lastBracket = jsonString.lastIndexOf(']');
 
                 if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-                    // Extrai apenas a parte que é JSON válido (do '[' ao ']')
                     jsonString = jsonString.substring(firstBracket, lastBracket + 1);
                 }
                 
                 try {
-                    // Tenta fazer o parsing da string isolada
                     const chunkRelatorio = JSON.parse(jsonString);
                     if (chunkRelatorio.length === 0) {
                         throw new Error("O JSON de resposta do Gemini estava vazio.");
@@ -124,20 +137,21 @@ O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                     relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
                 } catch (e) {
                      // Retorna a mensagem de erro detalhada
-                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
+                     throw new Error(`Erro de parsing do JSON no Lote ${index + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
                 }
             } else {
-                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
+                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${index + 1}.`);
             }
             
-            if (i === 0) {
-                // O restante da lógica de extração das métricas/observações permanece inalterada
+            // Apenas o lote 0 deve conter as observações.
+            if (index === 0) {
                 const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
                 relatoriosObservacoes.push(textAfterJson);
             }
         }
-
+        
         // --- 5. Montagem da Resposta Final ---
+        // Note que o backend continua retornando uma única string `analysis` para o frontend.
         const relatorioJSONCompleto = `\`\`\`json\n${JSON.stringify(relatorioFinalDetalhado, null, 2)}\n\`\`\``;
         const relatorioFinalCompleto = relatorioJSONCompleto + "\n\n" + relatoriosObservacoes.join('\n');
 
