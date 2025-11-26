@@ -293,14 +293,28 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     // ----------------------------------------------------------------------
     // 1. MAPA DE NOTAS (0-100) - NOVO 1º ITEM
     // ----------------------------------------------------------------------
-    let notasTextoCorrido = '';
-    relatorio_alunos.forEach((aluno, index) => {
-        const nota = aluno.Nota_Final_100 || 'N/A';
-        notasTextoCorrido += `${aluno.Aluno}: ${nota}`;
+    let notasHtmlVertical = '';
+    // Cor Azul para notas >= 70
+    const colorAprovado = '#007bff'; 
+    // Cor Vermelha para notas < 70
+    const colorReprovado = '#dc3545'; 
+    
+    relatorio_alunos.forEach(aluno => {
+        // Pega a nota no formato string (ex: "85,00")
+        const notaStr = aluno.Nota_Final_100 || '0,00';
+        // Converte para float para comparação, usando ponto como separador decimal
+        const notaFloat = parseFloat(notaStr.replace(',', '.')); 
         
-        if (index < relatorio_alunos.length - 1) {
-            notasTextoCorrido += ' | ';
-        }
+        // Define a cor: Azul (>= 70) ou Vermelho (< 70)
+        const color = notaFloat >= 70 ? colorAprovado : colorReprovado;
+        
+        // Formato vertical com cor e fonte aprimorada
+        notasHtmlVertical += `
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">
+                <span style="font-family: Arial, Helvetica, sans-serif; font-weight: 500;">${aluno.Aluno}</span>
+                <strong style="color: ${color}; font-family: Arial, Helvetica, sans-serif; font-size: 16px;">${notaStr}</strong>
+            </div>
+        `;
     });
 
     const mapaNotasHtml = `
@@ -309,15 +323,15 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
         
         <div style="border: 1px solid #6f42c1; padding: 20px; border-radius: 8px; background-color: #f6f0ff;">
             <h4 style="color: #6f42c1; margin-top: 0; border-bottom: 1px solid #6f42c1; padding-bottom: 10px;">
-                Notas Finais para Diário (Texto Corrido)
+                Notas Finais
             </h4>
             
-            <p style="white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: 14px; background-color: #fff; padding: 15px; border-radius: 6px; border: 1px dashed #ccc;">
-                ${notasTextoCorrido}
-            </p>
+            <div style="background-color: #fff; padding: 15px; border-radius: 6px; border: 1px dashed #ccc; max-height: 350px; overflow-y: auto;">
+                ${notasHtmlVertical}
+            </div>
             
             <p style="margin-top: 15px; color: #6f42c1; font-size: 14px;">
-                *Estas notas representam o desempenho percentual do aluno (Acertos / Total de Questões * 100) e podem ser transferidas diretamente para o diário.
+                *Notas em **azul** representam 70% ou mais de acerto.
             </p>
         </div>
     `;
