@@ -48,7 +48,7 @@
             color: #007bff;
             border-radius: 5px;
             text-align: left;
-            transition: background-color 0.3s; /* Adicionado para efeito visual */
+            transition: background-color 0.3s;
         }
         .button-group { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
         button {
@@ -61,8 +61,7 @@
         }
         #btn-definir-estrutura { background-color: #007bff; color: white; }
         #btn-definir-estrutura:hover { background-color: #0056b3; }
-        #processar-gabarito { background-color: #28a745; color: white; }
-        #processar-gabarito:hover { background-color: #1e7e34; }
+        /* O botão processar foi removido, mas o encerrar continua */
         #encerrar-gabaritos { background-color: #dc3545; color: white; width: 100%; margin-top: 30px; }
         #encerrar-gabaritos:hover { background-color: #c82333; }
         #encerrar-gabaritos:disabled, button:disabled { background-color: #f4f4f9; color: #6c757d; cursor: not-allowed; }
@@ -139,11 +138,10 @@
             <img id="gabarito-preview" alt="Pré-visualização do Gabarito" style="border: 2px solid #ddd;">
 
             <div class="button-group">
-                <button id="processar-gabarito" disabled>Processar Gabarito (Via IA)</button>
-            </div>
+                </div>
             
             <div id="resultado" style="background-color: #e9f5ff; border-color: #007bff; color: #007bff;">
-                Preencha o nome do aluno e carregue a imagem do gabarito para habilitar o botão.
+                Preencha o nome do aluno e carregue a imagem do gabarito para iniciar a análise automática.
             </div>
 
             <div id="leitura-confirmacao">
@@ -172,7 +170,7 @@
         const gabaritoInput = document.getElementById('gabarito-input');
         const gabaritoPreview = document.getElementById('gabarito-preview');
         const resultadoDiv = document.getElementById('resultado');
-        const processarBtn = document.getElementById('processar-gabarito');
+        // O botão processar-gabarito foi removido
         const encerrarBtn = document.getElementById('encerrar-gabaritos');
         const alunosCountSpan = document.getElementById('alunos-count');
         const numQuestoesInput = document.getElementById('num-questoes');
@@ -199,13 +197,9 @@
         // Estado temporário para a confirmação
         let alunoEmProcessamento = '';
         let respostasTemporarias = {};
+        let isProcessing = false; // Flag para evitar processamento duplicado
 
-        // --- FUNÇÃO HELPER: LER ARQUIVO COMO BASE64 (AGORA INDEPENDENTE) ---
-        /**
-         * Converte um objeto File em uma string Base64 (Data URL).
-         * @param {File} file O objeto File a ser lido.
-         * @returns {Promise<string>} A Promise que resolve para a string Data URL.
-         */
+        // --- FUNÇÃO HELPER: LER ARQUIVO COMO BASE64 ---
         function getFileAsBase64(file) {
             return new Promise((resolve, reject) => {
                 if (!file) {
@@ -294,11 +288,32 @@
             validarFormularioAluno(); 
         });
 
-        // --- C. LÓGICA DE INPUT E VALIDAÇÃO ---
+        // --- C. LÓGICA DE INPUT E INÍCIO DE PROCESSAMENTO AUTOMÁTICO ---
         
-        // Novo listener forçando a revalidação com setTimeout
+        // Escuta o input de nome para iniciar o processo se o arquivo já estiver lá
+        alunoInput.addEventListener('input', function() {
+            const alunoValido = alunoInput.value.trim() !== '';
+            const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
+            
+            if (alunoValido && imagemSelecionada && !isProcessing && leituraConfirmacaoDiv.style.display === 'none') {
+                resultadoDiv.textContent = `A imagem para ${alunoInput.value.trim()} foi carregada. Iniciando análise automática...`;
+                resultadoDiv.style.backgroundColor = '#d4edda';
+                resultadoDiv.style.borderColor = '#c3e6cb';
+                resultadoDiv.style.color = '#155724';
+                // Chama a análise imediatamente após o nome ser preenchido (se a imagem já está lá)
+                setTimeout(processarGabaritoImediatamente, 50);
+            } else if (imagemSelecionada && !alunoValido) {
+                 resultadoDiv.textContent = "Nome do aluno ausente. Por favor, preencha o nome para iniciar o processamento automático.";
+                 resultadoDiv.style.backgroundColor = '#fff3cd';
+                 resultadoDiv.style.color = '#856404';
+            }
+        });
+
+        // Listener PRINCIPAL: Carregamento do Arquivo (inicia o processamento)
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
+            const alunoValido = alunoInput.value.trim() !== '';
+            
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -306,54 +321,38 @@
                     gabaritoPreview.style.display = 'block';
                 }
                 reader.readAsDataURL(file); 
+                
+                if (alunoValido && !isProcessing) {
+                    resultadoDiv.textContent = `A imagem para ${alunoInput.value.trim()} foi carregada. Iniciando análise automática...`;
+                    resultadoDiv.style.backgroundColor = '#d4edda';
+                    resultadoDiv.style.borderColor = '#c3e6cb';
+                    resultadoDiv.style.color = '#155724';
+                    // Chama a análise imediatamente após o arquivo ser selecionado (se o nome já está lá)
+                    setTimeout(processarGabaritoImediatamente, 50); 
+                } else if (!alunoValido) {
+                     resultadoDiv.textContent = "Nome do aluno ausente. Por favor, preencha o nome para iniciar o processamento automático.";
+                     resultadoDiv.style.backgroundColor = '#fff3cd';
+                     resultadoDiv.style.color = '#856404';
+                }
             } else {
                 gabaritoPreview.style.display = 'none';
+                resultadoDiv.textContent = "Preencha o nome do aluno e carregue a imagem do gabarito para iniciar a análise automática.";
+                resultadoDiv.style.backgroundColor = '#e9f5ff';
+                resultadoDiv.style.color = '#007bff';
             }
-            
-            // CHAMADA CRÍTICA: Força a revalidação com um pequeno atraso (50ms)
-            setTimeout(validarFormularioAluno, 50); 
         });
-        
-        alunoInput.addEventListener('input', validarFormularioAluno);
 
-        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (MAIS SIMPLIFICADA)
+        // Função vazia (mantida por segurança, mas não faz nada crítico)
         function validarFormularioAluno() {
-            const alunoValido = alunoInput.value.trim() !== '';
-            const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
-
-            const podeProcessar = alunoValido && imagemSelecionada && (leituraConfirmacaoDiv.style.display === 'none'); 
-            
-            resultadoDiv.style.display = 'block'; 
-            
-            if (leituraConfirmacaoDiv.style.display !== 'none') {
-                return; // Não altera o status durante a confirmação
-            }
-
-            if (podeProcessar) {
-                 // Estado de OK para processar
-                 resultadoDiv.textContent = `✅ Pronto para processar gabarito de ${alunoInput.value.trim()} (Total: ${dadosGabaritos.length}). Clique no botão verde.`;
-                 resultadoDiv.style.backgroundColor = '#d4edda'; // Verde claro
-                 resultadoDiv.style.borderColor = '#c3e6cb';
-                 resultadoDiv.style.color = '#155724';
-            } else {
-                // Estado de BLOQUEIO (motivo)
-                let statusMsg = "🚧 Botão desabilitado. Motivo: ";
-                if (!alunoValido) statusMsg += "1. Nome do aluno ausente/inválido. ";
-                if (!imagemSelecionada) statusMsg += "2. Arquivo da imagem não carregado. ";
-
-                resultadoDiv.textContent = statusMsg.trim();
-                resultadoDiv.style.backgroundColor = '#fff3cd'; 
-                resultadoDiv.style.borderColor = '#ffeeba'; 
-                resultadoDiv.style.color = '#856404'; // Amarelo para aviso
-            }
-
-            // Ação principal: Habilitar ou desabilitar
-            processarBtn.disabled = !podeProcessar;
+             // Esta função agora apenas serve para manter a estrutura, mas é chamada 
+             // automaticamente pelos listeners do nome e do arquivo.
         }
-
-        // LÓGICA DE PROCESSAMENTO (INCLUINDO A CONVERSÃO DE ARQUIVO)
-        processarBtn.addEventListener('click', async function() {
-            processarBtn.disabled = true;
+        
+        // LÓGICA DE PROCESSAMENTO (AGORA UMA FUNÇÃO INDEPENDENTE)
+        async function processarGabaritoImediatamente() {
+            if (isProcessing) return; // Evita múltiplas execuções
+            
+            isProcessing = true;
             encerrarBtn.disabled = true; 
             
             const turma = turmaInput.value.trim();
@@ -361,8 +360,9 @@
             const file = gabaritoInput.files[0];
 
             if (!alunoEmProcessamento || !file) {
+                 // Deve ser pego pelos listeners acima, mas é um cheque de segurança
                  resultadoDiv.textContent = "Erro: Por favor, preencha o nome do aluno e envie a imagem.";
-                 processarBtn.disabled = false;
+                 isProcessing = false;
                  return;
             }
             
@@ -371,17 +371,16 @@
             resultadoDiv.style.color = '#007bff';
             
             try {
-                // PASSO CRÍTICO: CHAMA A FUNÇÃO PROMISE PARA LER O ARQUIVO AGORA
+                // PASSO CRÍTICO: LER ARQUIVO E CONVERTER PARA BASE64
                 const gabaritoParaProcessar = await getFileAsBase64(file);
                 
-                // Validação da Base64 (defensiva)
                 if (typeof gabaritoParaProcessar !== 'string' || !gabaritoParaProcessar.startsWith('data:image')) {
                      throw new Error("Erro na conversão Base64: O arquivo selecionado não é uma imagem válida ou a leitura falhou.");
                 }
 
                 resultadoDiv.textContent = `Enviando gabarito de ${alunoEmProcessamento} para a Inteligência Artificial (Gemini)...`;
 
-                // Remove o prefixo "data:image/jpeg;base64," ou similar
+                // Remove o prefixo
                 const base64Data = gabaritoParaProcessar.split(',')[1]; 
 
                 // CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM NO BACKEND (IA)
@@ -417,10 +416,11 @@
                 resultadoDiv.style.backgroundColor = '#f8d7da';
                 resultadoDiv.style.borderColor = '#f5c6cb';
                 resultadoDiv.style.color = '#721c24';
-                processarBtn.disabled = false;
                 encerrarBtn.disabled = dadosGabaritos.length === 0; 
+            } finally {
+                isProcessing = false;
             }
-        });
+        }
         
         // --- D. LÓGICA DE CONFIRMAÇÃO E REENVIO ---
 
@@ -428,16 +428,15 @@
             // Esconde os elementos de input e processamento
             alunoInput.disabled = true; 
             gabaritoInput.disabled = true;
-            processarBtn.style.display = 'none';
 
-            // Formata as respostas em 4 colunas para visualização
+            // Formata as respostas
             const respostasLidas = Object.entries(respostas);
             let respostasFormatadas = '';
             for (let i = 0; i < respostasLidas.length; i++) {
                 const [q, r] = respostasLidas[i];
                 respostasFormatadas += `${q}: ${r.padEnd(2, ' ')} `;
                 if ((i + 1) % 4 === 0) {
-                    respostasFormatadas += '\n'; // Quebra de linha a cada 4 questões
+                    respostasFormatadas += '\n'; 
                 }
             }
 
@@ -457,7 +456,6 @@
         function confirmarLeitura() {
             const dadosDoAluno = {
                 "Aluno": alunoEmProcessamento,
-                // Mapeia Q1: 'A', Q2: 'B', etc.
                 ...Object.fromEntries(
                     Object.entries(respostasTemporarias).map(([k, v]) => [`Q${k.match(/\d+/)[0]}`, v])
                 )
@@ -499,10 +497,7 @@
             alunoInput.disabled = false;
             gabaritoInput.disabled = false;
             
-            processarBtn.style.display = 'block';
-
             leituraConfirmacaoDiv.style.display = 'none';
-            validarFormularioAluno(); // Revalida o estado dos botões
         }
 
         // --- E. GERAÇÃO DE CSV E ENCERRAMENTO ---
@@ -525,7 +520,6 @@
             alunoInput.value = '';
             alunosCountSpan.textContent = '0';
             encerrarBtn.disabled = true;
-            processarBtn.disabled = true;
             gabaritoRespostasArea.innerHTML = '';
             
             gabaritoOficialSection.style.display = 'none';
@@ -540,7 +534,6 @@
         
         
         function gerarDownloadCSV() {
-            // O Gabarito Oficial é criado a partir do array de respostas
             const gabaritoOficialData = { "Aluno": "Gabarito Oficial" };
             for (let i = 1; i <= NUM_QUESTOES; i++) {
                 gabaritoOficialData[`Q${i}`] = gabaritoOficialRespostas[i-1];
@@ -549,15 +542,12 @@
             const dadosParaCSV = [gabaritoOficialData, ...dadosGabaritos];
             
             const separador = ';';
-            // Obtém todos os cabeçalhos de todas as linhas para garantir que todas as colunas sejam incluídas
             const allKeys = new Set();
             dadosParaCSV.forEach(obj => {
                 Object.keys(obj).forEach(key => allKeys.add(key));
             });
             
-            // A ordem dos cabeçalhos: Aluno, depois Q1, Q2, etc.
             const headers = ["Aluno", ...Array.from(allKeys).filter(k => k !== "Aluno").sort((a, b) => {
-                // Ordenação por número da questão (Q1, Q2, Q10)
                 const numA = parseInt(a.replace('Q', ''), 10);
                 const numB = parseInt(b.replace('Q', ''), 10);
                 return numA - numB;
@@ -568,7 +558,6 @@
             dadosParaCSV.forEach(row => {
                 const values = headers.map(header => {
                     let value = row[header] !== undefined ? String(row[header]) : '';
-                    // Protege contra separadores e quebras de linha no próprio valor
                     return `"${value.replace(/"/g, '""')}"`;
                 });
                 csvString += values.join(separador) + '\n';
@@ -591,9 +580,6 @@
                 document.body.removeChild(link);
             }
         }
-
-        // --- INICIALIZAÇÃO DE ESTADO ---
-        validarFormularioAluno(); 
     </script>
 </body>
 </html>
