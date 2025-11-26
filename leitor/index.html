@@ -82,7 +82,7 @@
             gap: 10px;
             margin-top: 15px;
         }
-        /* Novo elemento Canvas para processamento */
+        /* Canvas oculto para manipulação de imagem pelo OpenCV */
         #process-canvas { display: none; } 
     </style>
 </head>
@@ -92,9 +92,10 @@
 
         <div id="config-section">
             <h3>1. Configuração da Prova</h3>
-            <p>Informe a estrutura do gabarito que será enviado.</p>
+            <p>Informe a estrutura do gabarito que será enviado. **O modelo de gabarito impresso deve ter 4 marcas de referência nos cantos.**</p>
             <input type="number" id="num-questoes" placeholder="Número de Questões (Ex: 50)" min="1" required>
             <input type="number" id="num-alternativas" placeholder="Número de Alternativas (Ex: 5)" min="2" max="5" required>
+            <input type="number" id="num-pontos-referencia" value="4" disabled style="background-color: #f0f0f0;" title="O modelo de gabarito usa 4 pontos de referência fixos." required>
             
             <input type="text" id="turma-input" placeholder="Turma (Ex: 8A, 3º Ano B)" required>
 
@@ -139,7 +140,7 @@
         // Variável global que será preenchida quando o OpenCV estiver pronto
         let cv = null; 
         
-        // Elementos de UI
+        // Elementos de UI (Mantidos do passo anterior)
         const turmaInput = document.getElementById('turma-input');
         const alunoInput = document.getElementById('aluno-input');
         const gabaritoInput = document.getElementById('gabarito-input');
@@ -159,7 +160,7 @@
         const processCanvas = document.getElementById('process-canvas');
 
 
-        // Variáveis de Estado
+        // Variáveis de Estado (Mantidas do passo anterior)
         let dadosGabaritos = [];
         let gabaritoParaProcessar = null;
         let gabaritoOficialRespostas = [];
@@ -174,12 +175,12 @@
             if (cv && cv.Mat) {
                 resultadoDiv.textContent = "OpenCV.js carregado com sucesso. Defina a estrutura da prova.";
             } else {
-                resultadoDiv.textContent = "Erro ao carregar OpenCV.js.";
+                resultadoDiv.textContent = "Erro ao carregar OpenCV.js. Verifique sua conexão.";
             }
         }
         
         // --------------------------------------------------------
-        // B. LÓGICA DE CONFIGURAÇÃO (PASSO 1) (Mantida do passo anterior)
+        // B. LÓGICA DE CONFIGURAÇÃO (Mantida do passo anterior)
         // --------------------------------------------------------
         
         numQuestoesInput.addEventListener('input', validarConfig);
@@ -187,7 +188,6 @@
         turmaInput.addEventListener('input', validarConfig);
         
         function validarConfig() {
-            // ... (lógica de validação do passo anterior) ...
             const numQ = parseInt(numQuestoesInput.value);
             const numA = parseInt(numAlternativasInput.value);
             const turmaValida = turmaInput.value.trim() !== '';
@@ -257,11 +257,10 @@
         });
 
         // --------------------------------------------------------
-        // C. LÓGICA DE LEITURA (COM INTEGRAÇÃO OPENCV)
+        // C. LÓGICA DE LEITURA (Mantida do passo anterior)
         // --------------------------------------------------------
 
         gabaritoInput.addEventListener('change', function() {
-            // ... (lógica de pré-visualização e validação) ...
             const file = this.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -282,9 +281,8 @@
         alunoInput.addEventListener('input', validarFormularioAluno);
 
         function validarFormularioAluno() {
-            // ... (lógica de validação do passo anterior) ...
             const alunoValido = alunoInput.value.trim() !== '';
-            if (alunoValido && gabaritoParaProcessar && cv) { // Checa se CV está pronto
+            if (alunoValido && gabaritoParaProcessar && cv) { 
                 processarBtn.disabled = false;
             } else {
                 processarBtn.disabled = true;
@@ -307,7 +305,6 @@
             resultadoDiv.textContent = `Processando gabarito de ${aluno} (${turma}) com Visão Computacional...`;
             
             try {
-                // >> CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM <<
                 const respostasAluno = await processarImagemOpenCV(gabaritoParaProcessar); 
                 
                 const dadosDoAluno = {
@@ -332,7 +329,7 @@
                 resultadoDiv.style.color = '#155724';
             } catch (error) {
                 console.error("Erro no processamento OpenCV:", error);
-                resultadoDiv.textContent = `❌ Erro ao processar gabarito: ${error.message}. Tente outra foto.`;
+                resultadoDiv.textContent = `❌ Erro ao processar gabarito: ${error.message || 'Erro desconhecido'}. Tente outra foto.`;
                 resultadoDiv.style.backgroundColor = '#f8d7da';
                 resultadoDiv.style.borderColor = '#f5c6cb';
                 resultadoDiv.style.color = '#721c24';
@@ -343,21 +340,19 @@
         
         
         // --------------------------------------------------------
-        // D. FUNÇÃO DE VISÃO COMPUTACIONAL (ESQUELETO)
+        // D. FUNÇÃO DE VISÃO COMPUTACIONAL (LÓGICA INICIAL REAL)
         // --------------------------------------------------------
         
-        /**
-         * FUNÇÃO CORE: Lógica de Visão Computacional para ler a folha.
-         * @param {string} imageDataURL - A imagem Base64 do gabarito.
-         * @returns {Object} Um objeto com as respostas formatadas (Ex: { "Q1": "A", "Q2": "C" }).
-         */
+        const OUTPUT_WIDTH = 500; // Largura padronizada para a imagem corrigida
+        const OUTPUT_HEIGHT = 800; // Altura padronizada (Exemplo para um gabarito de 50Q, 2 Colunas)
+
         async function processarImagemOpenCV(imageDataURL) {
             
-            // 1. Carregar a Imagem no Canvas
             const img = new Image();
             img.src = imageDataURL;
             await new Promise(resolve => img.onload = resolve);
 
+            // 1. Carregar a Imagem no Canvas
             processCanvas.width = img.width;
             processCanvas.height = img.height;
             const ctx = processCanvas.getContext('2d');
@@ -365,86 +360,176 @@
 
             // 2. Converter para Matriz (cv.Mat) e Escala de Cinza
             let src = cv.imread(processCanvas);
-            let dst = new cv.Mat();
-            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-
-            // 3. PRÉ-PROCESSAMENTO: Detecção de Bordas e Correção de Perspectiva (CRUCIAL)
-            // Esta etapa é a mais difícil e exigirá um modelo de gabarito consistente (marcas de referência).
-
-            // // Exemplo de detecção de bordas (Canny) - Útil para encontrar as referências:
-            // let edges = new cv.Mat();
-            // cv.Canny(dst, edges, 75, 200, 3, false);
-            // // cv.imshow('process-canvas', edges); // Descomente para debug
-            // edges.delete();
-
-            // if (/* MARCAS DE REFERÊNCIA ENCONTRADAS */) {
-            //     // 3.1. Calcular a Matriz de Transformação de Perspectiva (Homography)
-            //     // 3.2. Aplicar cv.warpPerspective para corrigir a imagem para um retângulo perfeito
-            //     // src = warpedImage;
-            //     // cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0); // Repetir cinza na imagem corrigida
-            // } else {
-            //     // return dados simulados para não quebrar o fluxo enquanto a CV é implementada
-            //     src.delete();
-            //     dst.delete();
-            //     return simularRespostas();
-            //     // throw new Error("Não foi possível detectar as marcas de referência. Certifique-se de que o gabarito está bem visível e alinhado.");
-            // }
+            let gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
             
-            // 4. LEITURA DE MARCAÇÕES (Detecção e Análise de Bolhas)
-
-            // // 4.1. Definição da Região de Interesse (ROI) - Baseado na grade do gabarito
-            // const bolhas = []; // Array de coordenadas esperadas para cada bolha (Q1-A, Q1-B, etc.)
-
-            // // 4.2. Iterar sobre cada Questão e Alternativa (Bolhas)
-            // for (let i = 0; i < NUM_QUESTOES; i++) {
-            //     // 4.2.1. Extrair a ROI da questão
-            //     // 4.2.2. Aplicar um Treshold (cv.THRESH_BINARY_INV) para realçar as marcas escuras
-            //     // 4.2.3. Analisar a Densidade de Pixels Escuros (ou Contornos) em cada círculo
-            //     
-            //     // const marcacaoEncontrada = /* Encontrar a bolha mais escura */;
-            //     // respostas[`Q${i + 1}`] = alternativas[indiceDaMarcacao];
-            // }
-
-            // 5. Cleanup
-            src.delete();
-            dst.delete();
+            // Variáveis temporárias para limpeza de memória
+            let blurred = new cv.Mat();
+            let thresh = new cv.Mat();
+            let contours = new cv.MatVector();
+            let hierarchy = new cv.Mat();
             
-            // ATENÇÃO: Retorna simulação para não interromper o desenvolvimento
-            return simularRespostas(); 
-        }
+            // 3. PRÉ-PROCESSAMENTO: Detecção de Referências (4 Quadrados Pretos)
+            
+            // 3.1. Thresholding para isolar as marcas pretas (escuras)
+            cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+            cv.threshold(blurred, thresh, 50, 255, cv.THRESH_BINARY_INV);
+            
+            // 3.2. Encontrar Contornos
+            cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-        // --------------------------------------------------------
-        // E. FUNÇÃO DE SIMULAÇÃO (Usada temporariamente)
-        // --------------------------------------------------------
-        function simularRespostas() {
+            let biggestContours = [];
+            let minAreaThreshold = 100; // Ajustar conforme a resolução da imagem
+            
+            // Filtra os 4 maiores contornos que são suficientemente grandes (as marcas de referência)
+            for (let i = 0; i < contours.size(); ++i) {
+                let contour = contours.get(i);
+                let area = cv.contourArea(contour);
+                if (area > minAreaThreshold) {
+                    biggestContours.push({ area: area, contour: contour });
+                }
+            }
+            
+            // Ordenar por área e pegar os 4 maiores (os 4 pontos de referência)
+            biggestContours.sort((a, b) => b.area - a.area);
+
+            if (biggestContours.length < 4) {
+                 // Limpeza de memória antes de lançar o erro
+                 src.delete(); gray.delete(); blurred.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
+                 throw new Error("Não foi possível detectar as 4 marcas de referência na imagem. Tente tirar uma foto mais alinhada.");
+            }
+            
+            // 3.3. Obter os 4 pontos de referência (os centroides dos 4 maiores contornos)
+            const refPoints = [];
+            for(let i = 0; i < 4; i++) {
+                let M = cv.moments(biggestContours[i].contour);
+                let cX = M.m10 / M.m00;
+                let cY = M.m01 / M.m00;
+                refPoints.push({ x: cX, y: cY });
+            }
+            
+            // 3.4. Ordenar os pontos para garantir a ordem (Top-Left, Top-Right, Bottom-Right, Bottom-Left)
+            refPoints.sort((a, b) => a.y - b.y); // Ordena de cima para baixo
+            const topPoints = refPoints.slice(0, 2);
+            const bottomPoints = refPoints.slice(2, 4);
+            topPoints.sort((a, b) => a.x - b.x); // Ordena esquerda-direita
+            bottomPoints.sort((a, b) => a.x - b.x); 
+            
+            const orderedPoints = [
+                topPoints[0],      // Top-Left
+                topPoints[1],      // Top-Right
+                bottomPoints[1],   // Bottom-Right
+                bottomPoints[0]    // Bottom-Left
+            ];
+            
+            // 3.5. Correção de Perspectiva (Warpping)
+            let dsize = new cv.Size(OUTPUT_WIDTH, OUTPUT_HEIGHT);
+            let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                orderedPoints[0].x, orderedPoints[0].y,
+                orderedPoints[1].x, orderedPoints[1].y,
+                orderedPoints[2].x, orderedPoints[2].y,
+                orderedPoints[3].x, orderedPoints[3].y
+            ]);
+            
+            let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                0, 0, 
+                OUTPUT_WIDTH, 0,
+                OUTPUT_WIDTH, OUTPUT_HEIGHT, 
+                0, OUTPUT_HEIGHT
+            ]);
+            
+            let M = cv.getPerspectiveTransform(srcTri, dstTri);
+            let warped = new cv.Mat();
+            cv.warpPerspective(gray, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+            
+            // ***DEBUG: Para ver a imagem corrigida***
+            // cv.imshow('process-canvas', warped); // Substitui a imagem no canvas oculto
+
+            // 4. LEITURA DE MARCAÇÕES (Detecção de Bolhas)
+            
+            // 4.1. Configurações de Leitura
             const respostas = {};
             const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
             
-            for (let i = 1; i <= NUM_QUESTOES; i++) {
-                 // SIMULAÇÃO: Retorna a resposta correta 90% das vezes ou uma resposta aleatória errada
-                 const respostaCorreta = gabaritoOficialRespostas[i-1];
-                 
-                 let respostaSimulada;
-                 if (Math.random() < 0.90) {
-                     respostaSimulada = respostaCorreta; // Acerto
-                 } else {
-                     // Escolhe uma alternativa aleatória que não seja a correta
-                     const alternativasErradas = alternativas.filter(alt => alt !== respostaCorreta);
-                     respostaSimulada = alternativasErradas.length > 0 ? alternativasErradas[Math.floor(Math.random() * alternativasErradas.length)] : respostaCorreta;
-                 }
-                 
-                 respostas[`Q${i}`] = respostaSimulada;
+            // A largura de cada coluna de resposta (Ex: 2 colunas para 500px de largura)
+            const COL_WIDTH = OUTPUT_WIDTH / 2; 
+            // Altura de cada questão (Ex: 25 questões por coluna para 800px de altura)
+            const ROW_HEIGHT = OUTPUT_HEIGHT / (NUM_QUESTOES / 2); 
+            
+            // Limiar para determinar se uma bolha está preenchida (será usado no loop)
+            let THRESHOLD_FILL = 150; // Pixels mais escuros que 150 serão considerados preenchidos (preto é 0, branco é 255)
+
+            // 4.2. Iterar sobre cada Questão e Alternativa (Bolhas)
+            for (let q = 0; q < NUM_QUESTOES; q++) {
+                
+                // Determina a coluna (0 para Q1-Q25, 1 para Q26-Q50)
+                const col = q < NUM_QUESTOES / 2 ? 0 : 1;
+                // Determina o índice da linha na coluna
+                const row = q % (NUM_QUESTOES / 2); 
+                
+                let maiorEscuridao = 255; // Branco
+                let respostaAluno = 'X'; // 'X' para não marcado ou duplo marcado
+                
+                // Mapeamento de coordenadas (precisa ser calibrado no modelo real)
+                // Assumindo que a área da questão é um retângulo
+                const x_start = col * COL_WIDTH;
+                const y_start = row * ROW_HEIGHT;
+                const x_end = (col + 1) * COL_WIDTH;
+                const y_end = (row + 1) * ROW_HEIGHT;
+                
+                // ROI (Região de Interesse) da questão
+                let rect = new cv.Rect(x_start, y_start, COL_WIDTH, ROW_HEIGHT);
+                let questionROI = warped.roi(rect);
+                
+                // AQUI ENTRA A LÓGICA DE DETECÇÃO DE BOLHAS:
+                // No modelo ideal, você sabe a posição X exata de cada bolha A, B, C, D, E dentro da questionROI.
+                // O código deveria iterar sobre essas 5 posições de bolha:
+                
+                let foundMarking = false;
+                const bolhaWidth = COL_WIDTH / (NUM_ALTERNATIVAS + 1); // Largura aproximada de cada bolha
+                
+                for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
+                    // Coordenada X da bolha 'a' dentro da questionROI (EXEMPLO CONCEPTUAL)
+                    const bolhaX = bolhaWidth * (a + 1); 
+                    
+                    // Exemplo: Recortar a área da bolha para análise
+                    let bolhaRect = new cv.Rect(bolhaX - 10, questionROI.rows / 2 - 10, 20, 20); // Ajustar tamanho
+                    let bubbleROI = questionROI.roi(bolhaRect);
+                    
+                    // Média de Escuridão (Valor mais baixo = mais escuro)
+                    let mediaCor = cv.mean(bubbleROI)[0]; 
+                    
+                    if (mediaCor < maiorEscuridao) {
+                        maiorEscuridao = mediaCor;
+                        respostaAluno = alternativas[a];
+                    }
+                    
+                    bubbleROI.delete();
+                }
+                
+                questionROI.delete();
+                
+                // Regra de Decisão Final: Se a bolha mais escura ainda for muito clara, considera-se em branco.
+                if (maiorEscuridao > THRESHOLD_FILL) {
+                    respostaAluno = 'B'; // 'B' = Branco/Não marcado (Usando a convenção do seu CSV para nulo)
+                }
+
+                // Armazenar a resposta (Q1, Q2, etc.)
+                respostas[`Q${q + 1}`] = respostaAluno;
             }
-            return respostas;
+
+            // 5. Cleanup
+            src.delete(); gray.delete(); blurred.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
+            warped.delete(); M.delete(); srcTri.delete(); dstTri.delete();
+            
+            return respostas; 
         }
 
-
         // --------------------------------------------------------
-        // F. LÓGICA DE ENCERRAMENTO (Mantida do passo anterior)
+        // E. LÓGICA DE ENCERRAMENTO (Mantida do passo anterior)
         // --------------------------------------------------------
 
         encerrarBtn.addEventListener('click', function() {
-            // ... (lógica de encerramento e reset) ...
             if (dadosGabaritos.length === 0) {
                  resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
                  return;
@@ -477,7 +562,6 @@
         
         
         function gerarDownloadCSV() {
-            // ... (lógica de geração CSV do passo anterior) ...
             const gabaritoOficialData = { "Aluno": "Gabarito Oficial" };
             for (let i = 1; i <= NUM_QUESTOES; i++) {
                 gabaritoOficialData[`Q${i}`] = gabaritoOficialRespostas[i-1];
