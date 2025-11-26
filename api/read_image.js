@@ -25,21 +25,17 @@ module.exports = async (req, res) => {
     try {
         // Verifica a chave da API
         if (!process.env.GEMINI_API_KEY) {
-             throw new Error("Variável de ambiente GEMINI_API_KEY não está definida.");
+             throw new Error("Variável de ambiente GEMINI_API_KEY não está definida. Verifique a configuração do seu host.");
         }
         
         // 1. Extração de Dados do Request
-        // O frontend enviará a imagem em Base64, o total de questões e alternativas
         const { base64Image, numQuestoes, numAlternativas } = req.body;
         
         if (!base64Image || !numQuestoes || !numAlternativas) {
              throw new Error("Dados incompletos: imagem, número de questões ou alternativas ausentes.");
         }
 
-        // Assumimos JPEG, mas o Gemini é tolerante
-        const mimeType = 'image/jpeg'; 
-
-        // 2. Preparação do Conteúdo (Imagem + Texto)
+        const mimeType = 'image/jpeg'; // Assumimos JPEG
         const imagePart = base64ToGenerativePart(base64Image, mimeType);
         
         const alternativasString = ['A', 'B', 'C', 'D', 'E'].slice(0, numAlternativas).join(', ');
