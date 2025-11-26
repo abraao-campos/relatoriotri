@@ -191,7 +191,6 @@
 
         // Variáveis de Estado
         let dadosGabaritos = [];
-        let gabaritoParaProcessar = null; // String Base64 Completa
         let gabaritoOficialRespostas = [];
         let NUM_QUESTOES = 0;
         let NUM_ALTERNATIVAS = 0;
@@ -199,6 +198,25 @@
         // Estado temporário para a confirmação
         let alunoEmProcessamento = '';
         let respostasTemporarias = {};
+
+        // --- FUNÇÃO HELPER: LER ARQUIVO COMO BASE64 (AGORA INDEPENDENTE) ---
+        /**
+         * Converte um objeto File em uma string Base64 (Data URL).
+         * @param {File} file O objeto File a ser lido.
+         * @returns {Promise<string>} A Promise que resolve para a string Data URL.
+         */
+        function getFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    return reject(new Error("Nenhum arquivo fornecido."));
+                }
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
 
         // --- B. CONFIGURAÇÃO E DEFINIÇÃO DO GABARITO OFICIAL ---
         numQuestoesInput.addEventListener('input', validarConfig);
@@ -275,7 +293,9 @@
             validarFormularioAluno(); 
         });
 
-        // --- C. LÓGICA DE LEITURA DE ARQUIVO ---
+        // --- C. LÓGICA DE INPUT E VALIDAÇÃO ---
+        
+        // Novo listener de input que apenas mostra a prévia e valida o formulário
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
             if (file) {
@@ -283,28 +303,22 @@
                 reader.onload = function(e) {
                     gabaritoPreview.src = e.target.result;
                     gabaritoPreview.style.display = 'block';
-                    // NOTA: AQUI VAMOS APENAS GARANTIR QUE A IMAGEM FOI SELECIONADA.
-                    // O PROCESSAMENTO DA BASE64 SERÁ FEITO DENTRO DO processarBtn.
-                    gabaritoParaProcessar = e.target.result; 
-                    validarFormularioAluno(); 
                 }
-                // SE O ARQUIVO FOR GRANDE, ISTO PODE DEMORAR E FALHAR.
-                // A conversão Base64 ocorrerá agora antes da validação.
-                reader.readAsDataURL(file);
+                // Lê como URL para a pré-visualização, mas NÃO preenche o Base64 globalmente
+                reader.readAsDataURL(file); 
             } else {
                 gabaritoPreview.style.display = 'none';
-                gabaritoParaProcessar = null;
-                validarFormularioAluno();
             }
+            validarFormularioAluno(); // VALIDAÇÃO APÓS SELEÇÃO DO ARQUIVO
         });
         
         alunoInput.addEventListener('input', validarFormularioAluno);
 
-        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (VERSÃO SIMPLES: CHECA APENAS SE HÁ ARQUIVO NO INPUT)
+        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (VERSÃO FINAL SIMPLIFICADA)
         function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
             
-            // NOVO: Apenas verifica se um arquivo foi SELECIONADO no input, ignorando o estado Base64.
+            // Checa apenas se um arquivo foi SELECIONADO no input FILE
             const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
 
             const confirmacaoVisivel = leituraConfirmacaoDiv.style.display !== 'none';
@@ -337,26 +351,33 @@
             }
         }
 
+        // LÓGICA DE PROCESSAMENTO (AGORA INCLUINDO A CONVERSÃO DE ARQUIVO)
         processarBtn.addEventListener('click', async function() {
             processarBtn.disabled = true;
             encerrarBtn.disabled = true; 
             
             const turma = turmaInput.value.trim();
             alunoEmProcessamento = alunoInput.value.trim();
+            const file = gabaritoInput.files[0];
 
-            if (!alunoEmProcessamento || !gabaritoParaProcessar) {
+            if (!alunoEmProcessamento || !file) {
                  resultadoDiv.textContent = "Erro: Por favor, preencha o nome do aluno e envie a imagem.";
                  processarBtn.disabled = false;
                  return;
             }
             
-            resultadoDiv.textContent = `Processando gabarito de ${alunoEmProcessamento} (${turma}) com Inteligência Artificial (Gemini)...`;
+            resultadoDiv.textContent = `Processando gabarito de ${alunoEmProcessamento} (${turma}). Lendo arquivo e convertendo para Base64...`;
             
             try {
-                // VALIDAÇÃO DA BASE64: GARANTIMOS QUE É UMA STRING VÁLIDA AQUI
+                // PASSO CRÍTICO: CHAMA A FUNÇÃO PROMISE PARA LER O ARQUIVO AGORA
+                const gabaritoParaProcessar = await getFileAsBase64(file);
+                
+                // Validação da Base64 (defensiva)
                 if (typeof gabaritoParaProcessar !== 'string' || !gabaritoParaProcessar.startsWith('data:image')) {
-                     throw new Error("Erro na Base64: A imagem não foi lida corretamente. Tente reenviar o arquivo.");
+                     throw new Error("Erro na conversão Base64: O arquivo selecionado não é uma imagem válida ou a leitura falhou.");
                 }
+
+                resultadoDiv.textContent = `Enviando gabarito de ${alunoEmProcessamento} para a Inteligência Artificial (Gemini)...`;
 
                 // Remove o prefixo "data:image/jpeg;base64," ou similar
                 const base64Data = gabaritoParaProcessar.split(',')[1]; 
@@ -470,8 +491,9 @@
             }
             respostasTemporarias = {};
             gabaritoInput.value = '';
-            gabaritoParaProcessar = null;
-            gabaritoPreview.style.display = 'none';
+            
+            // O Base64 não é mais uma variável global, então apenas resetamos o preview
+            gabaritoPreview.style.display = 'none'; 
             
             alunoInput.disabled = false;
             gabaritoInput.disabled = false;
