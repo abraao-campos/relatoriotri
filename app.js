@@ -36,7 +36,7 @@ function csvToJson(csvContent) {
         const values = currentLine.split(separator).map(value => value.trim());
         // Garante que o número de colunas bate com o cabeçalho
         if (values.length !== headers.length) {
-            // AVISO: Esta linha é ignorada, mas indica um problema no CSV de origem
+            // Linha ignorada
             console.warn(`Linha ignorada devido a colunas inconsistentes: ${currentLine}`);
             continue;
         }
@@ -181,8 +181,7 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         
         // 1. EXTRAÇÃO DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
         if (resumo_e_metricas) {
-            // CORREÇÃO DA REGEX: Mais robusta para capturar o bloco 'text' até o fechamento ```
-            // Captura tudo [s\S] entre ```text e ```, ignorando espaços/quebras de linha ao redor
+            // Regex robusta para capturar o bloco 'text'
             const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)```/i);
             
             if (obsMatch && obsMatch[1]) {
@@ -191,20 +190,36 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
             }
         }
         
-        // 2. RECALCULAR MÉTRICAS (GARANTINDO 100% DE PRECISÃO)
+        // 2. RECALCULAR MÉTRICAS E PERCENTUAL DE CADA ALUNO (GARANTINDO 100% DE PRECISÃO)
         let totalAcertos = 0;
         let maiorPontuacao = 0;
         let menorPontuacao = Infinity; 
+        
+        // Define o total de questões (em número) baseado no primeiro aluno
+        const totalQuestoesNum = parseInt(relatorio_alunos[0].Total_Questoes, 10);
+        totalQuestoes = totalQuestoesNum.toString(); // mantém a string para exibição
 
-        // Define o total de questões baseado no primeiro aluno
-        totalQuestoes = relatorio_alunos[0].Total_Questoes;
+        if (totalQuestoesNum === 0 || isNaN(totalQuestoesNum)) {
+             throw new Error("Total de Questões inválido ou zero. Verifique o cabeçalho do CSV.");
+        }
+
         relatorio_alunos.forEach(aluno => {
-            // O uso de parseInt() no front-end é robusto para o campo Acertos
             const acertos = parseInt(aluno.Acertos, 10); 
+            
             if (!isNaN(acertos)) {
                 totalAcertos += acertos;
                 maiorPontuacao = Math.max(maiorPontuacao, acertos);
                 menorPontuacao = Math.min(menorPontuacao, acertos);
+                
+                // <<< CÁLCULO E SOBRESCRITA DO PERCENTUAL AQUI >>>
+                const percentCalc = (acertos / totalQuestoesNum) * 100;
+                // Formata com 2 casas decimais e usa vírgula como separador (padrão brasileiro)
+                aluno.Percentual_Acerto = percentCalc.toFixed(2).replace('.', ',');
+                // <<< FIM DO CÁLCULO >>>
+            } else {
+                // Garante que o Acertos seja '0' para cálculos se for inválido
+                aluno.Acertos = '0';
+                aluno.Percentual_Acerto = '0,00';
             }
         });
 
@@ -247,8 +262,8 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     relatorio_alunos.forEach(aluno => {
         // CORREÇÃO DE ROBUSTEZ 1: Garante que Erros não seja 'undefined'
         const errosSeguro = aluno.Erros || 'N/A';
-        // CORREÇÃO DE ROBUSTEZ 2: Garante que Percentual_Acerto não seja 'undefined'
-        const percentualAcertoSeguro = aluno.Percentual_Acerto || "0,00"; 
+        // O Percentual_Acerto agora é garantidamente válido e calculado
+        const percentualAcertoSeguro = aluno.Percentual_Acerto; 
         
         const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
         const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
