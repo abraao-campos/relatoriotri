@@ -29,7 +29,8 @@ module.exports = async (req, res) => {
         
         // --- 1. Extração de Dados ---
         const { resultadosContent, resultadosFilename } = req.body;
-        const alunosOriginal = JSON.parse(resultadosContent);
+        // ** Ponto de falha mais provável: Se resultadosContent não for um JSON string válido, o código para aqui.
+        const alunosOriginal = JSON.parse(resultadosContent); 
 
         if (alunosOriginal.length === 0) {
             return res.status(400).json({ success: false, error: "O arquivo de resultados não contém dados após a conversão." });
@@ -68,4 +69,99 @@ Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média
                 
                 **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
             } else {
-                // Prompt simplificado (APENAS
+                // Prompt simplificado (APENAS CORREÇÃO JSON) para lotes subsequentes
+                prompt = `Continue a correção.
+Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir o desempenho dos alunos no JSON abaixo com base no Gabarito Oficial (primeira linha).
+O campo "Total_Questoes" deve ser **${totalQuestoes}**.
+                
+Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o formato: \`\`\`json [ {"Aluno": "...", "Acertos": "...", ...}, ...] \`\`\`
+                
+                **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
+            }
+            
+            // 3. Chamada à API e Tratamento de Erro (API)
+            let response;
+            try {
+                response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: prompt,
+                    config: {
+                 
+                        responseMimeType: 'text/plain',
+                        temperature: 0.1,
+                    }
+                });
+            } catch (apiError) {
+                throw new Error(`Falha na comunicação com a API do Gemini no Lote ${i + 1}. Verifique sua chave API. Detalhe: ${apiError.message}`);
+            }
+
+            // 4. EXTRAÇÃO ROBUSTA E CONCATENAÇÃO
+            const fullText = response.text.trim();
+            const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+            
+            if (jsonMatch) {
+                let jsonString = jsonMatch[1].trim();
+                // Pega o conteúdo interno e faz um trim inicial
+
+                // Tenta ser mais robusto: isola o conteúdo entre o primeiro '[' e o último ']'
+                // Isso remove qualquer caractere extra que o Gemini possa ter colocado após o JSON
+                const firstBracket = jsonString.indexOf('[');
+                const lastBracket = jsonString.lastIndexOf(']');
+
+                if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+                    // Extrai apenas a parte que é JSON válido (do '[' ao ']')
+                    jsonString = jsonString.substring(firstBracket, lastBracket + 1);
+                }
+                
+                try {
+                    // Tenta fazer o parsing da string isolada
+                    const chunkRelatorio = JSON.parse(jsonString);
+                    if (chunkRelatorio.length === 0) {
+                        throw new Error("O JSON de resposta do Gemini estava vazio.");
+                    }
+                    relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
+                } catch (e) {
+                     // Retorna a mensagem de erro detalhada
+                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
+                }
+            } else {
+                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
+            }
+            
+            if (i === 0) {
+                // Extrai todo o texto (Métricas e Observações) que vem APÓS o bloco JSON
+                const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
+                relatoriosObservacoes.push(textAfterJson);
+            }
+        }
+
+        // --- 5. Montagem da Resposta Final (ESTRUTURADA) ---
+        
+        let metricasEobservacoes = null;
+        if (relatoriosObservacoes.length > 0) {
+            // Usa join para garantir uma string limpa das métricas/observações do primeiro lote
+            metricasEobservacoes = relatoriosObservacoes.join('\n\n'); 
+        }
+
+        // Retorna a resposta de sucesso com status 200
+        return res.status(200).json({
+            success: true,
+            // 1. Retorna o Array JSON de forma nativa
+            relatorio_alunos: relatorioFinalDetalhado, 
+            // 2. Retorna o texto extraído (Métricas + Observações)
+            resumo_e_metricas: metricasEobservacoes,
+            error: null 
+        });
+    } catch (e) {
+        // Captura qualquer erro não tratado e formata como JSON de erro
+        
+        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações") || e.message.includes("GEMINI_API_KEY não está definida")) ?
+        400 : 500;
+
+        console.error(`ERRO CRÍTICO NO HANDLER (Status ${statusCode}):`, e.message);
+        return res.status(statusCode).json({ 
+            success: false, 
+            error: `Falha no processamento: ${e.message}`
+        });
+    }
+};
