@@ -271,6 +271,8 @@
             inputSection.style.display = 'block';
             resultadoDiv.textContent = `Gabarito Oficial (Q1-Q${NUM_QUESTOES}) definido. Turma ${turmaInput.value} travada. Pronto para a leitura do primeiro aluno.`;
             resultadoDiv.style.display = 'block';
+            // Chama a validação imediatamente após entrar na seção de input
+            validarFormularioAluno(); 
         });
 
         // --- C. LÓGICA DE LEITURA DE ARQUIVO ---
@@ -294,10 +296,37 @@
         
         alunoInput.addEventListener('input', validarFormularioAluno);
 
+        // FUNÇÃO CRÍTICA DE VALIDAÇÃO (COM DEBUG VISÍVEL)
         function validarFormularioAluno() {
             const alunoValido = alunoInput.value.trim() !== '';
-            // Só permite processar se houver nome, imagem E não estiver na tela de confirmação
-            if (alunoValido && gabaritoParaProcessar && leituraConfirmacaoDiv.style.display === 'none') { 
+            const imagemCarregada = gabaritoParaProcessar !== null;
+            const confirmacaoVisivel = leituraConfirmacaoDiv.style.display !== 'none';
+            const podeProcessar = alunoValido && imagemCarregada && !confirmacaoVisivel;
+            
+            // --- DEBUG VISÍVEL ---
+            if (inputSection.style.display === 'block') {
+                if (podeProcessar) {
+                     // Estado de OK para processar
+                     resultadoDiv.textContent = `Pronto para processar gabarito de ${alunoInput.value.trim()} (Total: ${dadosGabaritos.length}).`;
+                     resultadoDiv.style.backgroundColor = '#e9f5ff';
+                     resultadoDiv.style.borderColor = '#007bff';
+                     resultadoDiv.style.color = '#007bff';
+                } else if (!confirmacaoVisivel) {
+                    // Estado de BLOQUEIO (motivo)
+                    let debugMsg = "🚧 Botão desabilitado: ";
+                    if (!alunoValido) debugMsg += "1. Nome do aluno ausente/inválido. ";
+                    if (!imagemCarregada) debugMsg += "2. Arquivo da imagem não carregado. ";
+
+                    resultadoDiv.style.display = 'block';
+                    resultadoDiv.textContent = debugMsg.trim();
+                    resultadoDiv.style.backgroundColor = '#fff3cd'; 
+                    resultadoDiv.style.borderColor = '#ffeeba'; 
+                    resultadoDiv.style.color = '#856404';
+                }
+            }
+            // --- FIM DEBUG VISÍVEL ---
+
+            if (podeProcessar) { 
                 processarBtn.disabled = false;
             } else {
                 processarBtn.disabled = true;
@@ -357,7 +386,7 @@
                 resultadoDiv.style.borderColor = '#f5c6cb';
                 resultadoDiv.style.color = '#721c24';
                 processarBtn.disabled = false;
-                encerrarBtn.disabled = dadosGabaritos.length === 0; // Reabilita o Encerrar se já houver dados
+                encerrarBtn.disabled = dadosGabaritos.length === 0; 
             }
         });
         
@@ -515,7 +544,6 @@
         }
 
         // --- INICIALIZAÇÃO DE ESTADO (CORREÇÃO) ---
-        // Garante que o estado inicial do botão "Processar" seja definido corretamente.
         validarFormularioAluno(); 
     </script>
 </body>
