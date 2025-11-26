@@ -449,7 +449,8 @@
             
             // ***PASSO CRUCIAL PARA CALIBRAÇÃO: EXIBE A IMAGEM CORRIGIDA***
             cv.imshow('process-canvas', warped); 
-            gabaritoPreview.src = processCanvas.toToDataURL(); // Exibe a imagem corrigida no preview principal
+            // CORREÇÃO: toToDataURL() para toDataURL()
+            gabaritoPreview.src = processCanvas.toDataURL(); 
             gabaritoPreview.style.borderColor = '#28a745'; // Borda verde para sucesso na correção
 
             // 4. LEITURA DE MARCAÇÕES (Detecção de Bolhas)
@@ -474,7 +475,6 @@
             const ROW_HEIGHT = TOTAL_RESPONSES_AREA_HEIGHT / QUESTOES_POR_COLUNA;
             
             // AJUSTE CRÍTICO: Limiar para considerar uma bolha preenchida (MAIS TOLERANTE)
-            // Aumentado de 120 para 170.
             const THRESHOLD_FILL = 170; 
 
             // 4.2. Iterar sobre cada Questão e Alternativa
