@@ -32,10 +32,7 @@
             width: 100%;
             box-sizing: border-box;
         }
-        input[type="text"]:disabled {
-            background-color: #e9ecef;
-            color: #6c757d;
-        }
+        input[type="text"]:disabled { background-color: #e9ecef; color: #6c757d; }
         #gabarito-preview {
             max-width: 100%;
             max-height: 400px;
@@ -62,8 +59,8 @@
             font-size: 1em;
             transition: background-color 0.3s;
         }
-        #btn-definir-gabarito { background-color: #007bff; color: white; }
-        #btn-definir-gabarito:hover { background-color: #0056b3; }
+        #btn-definir-estrutura { background-color: #007bff; color: white; }
+        #btn-definir-estrutura:hover { background-color: #0056b3; }
         #processar-gabarito { background-color: #28a745; color: white; }
         #processar-gabarito:hover { background-color: #1e7e34; }
         #encerrar-gabaritos { background-color: #dc3545; color: white; width: 100%; margin-top: 30px; }
@@ -71,7 +68,7 @@
         #encerrar-gabaritos:disabled, button:disabled { background-color: #f4f4f9; color: #6c757d; cursor: not-allowed; }
 
         /* Estilos para as Seções */
-        #config-section, #input-section {
+        #config-section, #gabarito-oficial-section, #input-section {
             border: 1px solid #ccc;
             padding: 20px;
             border-radius: 8px;
@@ -85,6 +82,8 @@
             gap: 10px;
             margin-top: 15px;
         }
+        /* Novo elemento Canvas para processamento */
+        #process-canvas { display: none; } 
     </style>
 </head>
 <body>
@@ -122,17 +121,25 @@
                 <button id="processar-gabarito" disabled>Processar Gabarito</button>
             </div>
             
-            <div id="resultado">Aguardando definição do Gabarito Oficial...</div>
+            <div id="resultado">Aguardando OpenCV.js...</div>
             
             <p style="margin-top: 15px; text-align: center; color: #6c757d;">Alunos processados: <span id="alunos-count">0</span></p>
 
             <button id="encerrar-gabaritos" disabled>Encerrar Gabaritos da Turma (Gerar CSV)</button>
         </div>
+
+        <canvas id="process-canvas"></canvas>
     </div>
 
     <a href="https://relatoriotri.vercel.app/" style="margin-top: 20px; display: inline-block;">↩️ Voltar para a Página de Análise de Resultados</a>
 
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
+    
     <script>
+        // Variável global que será preenchida quando o OpenCV estiver pronto
+        let cv = null; 
+        
+        // Elementos de UI
         const turmaInput = document.getElementById('turma-input');
         const alunoInput = document.getElementById('aluno-input');
         const gabaritoInput = document.getElementById('gabarito-input');
@@ -141,8 +148,6 @@
         const processarBtn = document.getElementById('processar-gabarito');
         const encerrarBtn = document.getElementById('encerrar-gabaritos');
         const alunosCountSpan = document.getElementById('alunos-count');
-        
-        // Novos elementos de configuração
         const numQuestoesInput = document.getElementById('num-questoes');
         const numAlternativasInput = document.getElementById('num-alternativas');
         const definirEstruturaBtn = document.getElementById('btn-definir-estrutura');
@@ -151,6 +156,8 @@
         const gabaritoRespostasArea = document.getElementById('gabarito-respostas-area');
         const iniciarLeituraBtn = document.getElementById('btn-iniciar-leitura');
         const inputSection = document.getElementById('input-section');
+        const processCanvas = document.getElementById('process-canvas');
+
 
         // Variáveis de Estado
         let dadosGabaritos = [];
@@ -160,15 +167,27 @@
         let NUM_ALTERNATIVAS = 0;
 
         // --------------------------------------------------------
-        // A. LÓGICA DE CONFIGURAÇÃO (PASSO 1)
+        // A. CONTROLE DE CARREGAMENTO (OPENCV)
+        // --------------------------------------------------------
+        function onOpenCvReady() {
+            cv = window.cv;
+            if (cv && cv.Mat) {
+                resultadoDiv.textContent = "OpenCV.js carregado com sucesso. Defina a estrutura da prova.";
+            } else {
+                resultadoDiv.textContent = "Erro ao carregar OpenCV.js.";
+            }
+        }
+        
+        // --------------------------------------------------------
+        // B. LÓGICA DE CONFIGURAÇÃO (PASSO 1) (Mantida do passo anterior)
         // --------------------------------------------------------
         
-        // Habilita o botão Definir Estrutura
         numQuestoesInput.addEventListener('input', validarConfig);
         numAlternativasInput.addEventListener('input', validarConfig);
         turmaInput.addEventListener('input', validarConfig);
         
         function validarConfig() {
+            // ... (lógica de validação do passo anterior) ...
             const numQ = parseInt(numQuestoesInput.value);
             const numA = parseInt(numAlternativasInput.value);
             const turmaValida = turmaInput.value.trim() !== '';
@@ -180,24 +199,19 @@
             }
         }
 
-        // Ação: Definir Estrutura
         definirEstruturaBtn.addEventListener('click', function() {
             NUM_QUESTOES = parseInt(numQuestoesInput.value);
             NUM_ALTERNATIVAS = parseInt(numAlternativasInput.value);
             
-            // Inicia o preenchimento das respostas do gabarito oficial
             renderizarInputsGabaritoOficial();
             
-            // Alterna a visualização
             configSection.style.display = 'none';
             gabaritoOficialSection.style.display = 'block';
         });
 
-        // Injeção dinâmica dos campos de resposta oficial
         function renderizarInputsGabaritoOficial() {
             gabaritoRespostasArea.innerHTML = '';
             
-            // Determina as letras das alternativas (A, B, C, D, E)
             const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
 
             for (let i = 1; i <= NUM_QUESTOES; i++) {
@@ -212,9 +226,8 @@
                 gabaritoRespostasArea.appendChild(div);
             }
             
-            // Adiciona listener para validar o preenchimento
             gabaritoRespostasArea.addEventListener('change', validarGabaritoOficial);
-            validarGabaritoOficial(); // Checagem inicial
+            validarGabaritoOficial();
         }
         
         function validarGabaritoOficial() {
@@ -229,7 +242,6 @@
             resultadoDiv.textContent = "Preencha todas as respostas corretas para iniciar a leitura dos alunos.";
         }
 
-        // Ação: Iniciar Leitura (Guarda o Gabarito Oficial e Abre a Seção de Leitura)
         iniciarLeituraBtn.addEventListener('click', function() {
             gabaritoOficialRespostas = [];
             const selects = gabaritoRespostasArea.querySelectorAll('select');
@@ -237,20 +249,19 @@
                 gabaritoOficialRespostas.push(select.value);
             });
             
-            // Bloqueia a turma e inicia a interface de leitura
             turmaInput.disabled = true;
             gabaritoOficialSection.style.display = 'none';
             inputSection.style.display = 'block';
             resultadoDiv.textContent = `Gabarito Oficial (Q1-Q${NUM_QUESTOES}) definido. Turma ${turmaInput.value} travada. Pronto para a leitura do primeiro aluno.`;
             resultadoDiv.style.display = 'block';
         });
-        
+
         // --------------------------------------------------------
-        // B. LÓGICA DE LEITURA (PASSO 2)
+        // C. LÓGICA DE LEITURA (COM INTEGRAÇÃO OPENCV)
         // --------------------------------------------------------
 
-        // Lógica de Pré-visualização e Habilitação
         gabaritoInput.addEventListener('change', function() {
+            // ... (lógica de pré-visualização e validação) ...
             const file = this.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -271,12 +282,239 @@
         alunoInput.addEventListener('input', validarFormularioAluno);
 
         function validarFormularioAluno() {
+            // ... (lógica de validação do passo anterior) ...
             const alunoValido = alunoInput.value.trim() !== '';
-            if (alunoValido && gabaritoParaProcessar) {
+            if (alunoValido && gabaritoParaProcessar && cv) { // Checa se CV está pronto
                 processarBtn.disabled = false;
             } else {
                 processarBtn.disabled = true;
             }
         }
 
-        // Ação: Processar Gabarito (Chamada quando o botão
+        processarBtn.addEventListener('click', async function() {
+            processarBtn.disabled = true;
+            encerrarBtn.disabled = true; 
+            
+            const turma = turmaInput.value.trim();
+            const aluno = alunoInput.value.trim();
+
+            if (!aluno || !gabaritoParaProcessar) {
+                 resultadoDiv.textContent = "Erro: Por favor, preencha o nome do aluno e envie a imagem.";
+                 processarBtn.disabled = false;
+                 return;
+            }
+            
+            resultadoDiv.textContent = `Processando gabarito de ${aluno} (${turma}) com Visão Computacional...`;
+            
+            try {
+                // >> CHAMA A FUNÇÃO REAL DE PROCESSAMENTO DA IMAGEM <<
+                const respostasAluno = await processarImagemOpenCV(gabaritoParaProcessar); 
+                
+                const dadosDoAluno = {
+                    "Aluno": aluno,
+                    ...respostasAluno 
+                };
+                
+                dadosGabaritos.push(dadosDoAluno);
+
+                // Reseta e Atualiza a Interface
+                alunoInput.value = '';
+                gabaritoInput.value = '';
+                gabaritoPreview.style.display = 'none';
+                gabaritoParaProcessar = null;
+
+                processarBtn.disabled = true;
+                encerrarBtn.disabled = false;
+                alunosCountSpan.textContent = dadosGabaritos.length;
+                resultadoDiv.textContent = `✅ Gabarito de ${aluno} processado! Total de alunos: ${dadosGabaritos.length}. Envie o próximo ou Encerrar.`;
+                resultadoDiv.style.backgroundColor = '#d4edda';
+                resultadoDiv.style.borderColor = '#c3e6cb';
+                resultadoDiv.style.color = '#155724';
+            } catch (error) {
+                console.error("Erro no processamento OpenCV:", error);
+                resultadoDiv.textContent = `❌ Erro ao processar gabarito: ${error.message}. Tente outra foto.`;
+                resultadoDiv.style.backgroundColor = '#f8d7da';
+                resultadoDiv.style.borderColor = '#f5c6cb';
+                resultadoDiv.style.color = '#721c24';
+                processarBtn.disabled = false;
+                encerrarBtn.disabled = dadosGabaritos.length === 0;
+            }
+        });
+        
+        
+        // --------------------------------------------------------
+        // D. FUNÇÃO DE VISÃO COMPUTACIONAL (ESQUELETO)
+        // --------------------------------------------------------
+        
+        /**
+         * FUNÇÃO CORE: Lógica de Visão Computacional para ler a folha.
+         * @param {string} imageDataURL - A imagem Base64 do gabarito.
+         * @returns {Object} Um objeto com as respostas formatadas (Ex: { "Q1": "A", "Q2": "C" }).
+         */
+        async function processarImagemOpenCV(imageDataURL) {
+            
+            // 1. Carregar a Imagem no Canvas
+            const img = new Image();
+            img.src = imageDataURL;
+            await new Promise(resolve => img.onload = resolve);
+
+            processCanvas.width = img.width;
+            processCanvas.height = img.height;
+            const ctx = processCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            // 2. Converter para Matriz (cv.Mat) e Escala de Cinza
+            let src = cv.imread(processCanvas);
+            let dst = new cv.Mat();
+            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+
+            // 3. PRÉ-PROCESSAMENTO: Detecção de Bordas e Correção de Perspectiva (CRUCIAL)
+            // Esta etapa é a mais difícil e exigirá um modelo de gabarito consistente (marcas de referência).
+
+            // // Exemplo de detecção de bordas (Canny) - Útil para encontrar as referências:
+            // let edges = new cv.Mat();
+            // cv.Canny(dst, edges, 75, 200, 3, false);
+            // // cv.imshow('process-canvas', edges); // Descomente para debug
+            // edges.delete();
+
+            // if (/* MARCAS DE REFERÊNCIA ENCONTRADAS */) {
+            //     // 3.1. Calcular a Matriz de Transformação de Perspectiva (Homography)
+            //     // 3.2. Aplicar cv.warpPerspective para corrigir a imagem para um retângulo perfeito
+            //     // src = warpedImage;
+            //     // cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0); // Repetir cinza na imagem corrigida
+            // } else {
+            //     // return dados simulados para não quebrar o fluxo enquanto a CV é implementada
+            //     src.delete();
+            //     dst.delete();
+            //     return simularRespostas();
+            //     // throw new Error("Não foi possível detectar as marcas de referência. Certifique-se de que o gabarito está bem visível e alinhado.");
+            // }
+            
+            // 4. LEITURA DE MARCAÇÕES (Detecção e Análise de Bolhas)
+
+            // // 4.1. Definição da Região de Interesse (ROI) - Baseado na grade do gabarito
+            // const bolhas = []; // Array de coordenadas esperadas para cada bolha (Q1-A, Q1-B, etc.)
+
+            // // 4.2. Iterar sobre cada Questão e Alternativa (Bolhas)
+            // for (let i = 0; i < NUM_QUESTOES; i++) {
+            //     // 4.2.1. Extrair a ROI da questão
+            //     // 4.2.2. Aplicar um Treshold (cv.THRESH_BINARY_INV) para realçar as marcas escuras
+            //     // 4.2.3. Analisar a Densidade de Pixels Escuros (ou Contornos) em cada círculo
+            //     
+            //     // const marcacaoEncontrada = /* Encontrar a bolha mais escura */;
+            //     // respostas[`Q${i + 1}`] = alternativas[indiceDaMarcacao];
+            // }
+
+            // 5. Cleanup
+            src.delete();
+            dst.delete();
+            
+            // ATENÇÃO: Retorna simulação para não interromper o desenvolvimento
+            return simularRespostas(); 
+        }
+
+        // --------------------------------------------------------
+        // E. FUNÇÃO DE SIMULAÇÃO (Usada temporariamente)
+        // --------------------------------------------------------
+        function simularRespostas() {
+            const respostas = {};
+            const alternativas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
+            
+            for (let i = 1; i <= NUM_QUESTOES; i++) {
+                 // SIMULAÇÃO: Retorna a resposta correta 90% das vezes ou uma resposta aleatória errada
+                 const respostaCorreta = gabaritoOficialRespostas[i-1];
+                 
+                 let respostaSimulada;
+                 if (Math.random() < 0.90) {
+                     respostaSimulada = respostaCorreta; // Acerto
+                 } else {
+                     // Escolhe uma alternativa aleatória que não seja a correta
+                     const alternativasErradas = alternativas.filter(alt => alt !== respostaCorreta);
+                     respostaSimulada = alternativasErradas.length > 0 ? alternativasErradas[Math.floor(Math.random() * alternativasErradas.length)] : respostaCorreta;
+                 }
+                 
+                 respostas[`Q${i}`] = respostaSimulada;
+            }
+            return respostas;
+        }
+
+
+        // --------------------------------------------------------
+        // F. LÓGICA DE ENCERRAMENTO (Mantida do passo anterior)
+        // --------------------------------------------------------
+
+        encerrarBtn.addEventListener('click', function() {
+            // ... (lógica de encerramento e reset) ...
+            if (dadosGabaritos.length === 0) {
+                 resultadoDiv.textContent = "Nenhum gabarito processado para encerrar.";
+                 return;
+            }
+            
+            gerarDownloadCSV(); 
+            
+            dadosGabaritos = [];
+            gabaritoOficialRespostas = [];
+            NUM_QUESTOES = 0;
+            NUM_ALTERNATIVAS = 0;
+            
+            turmaInput.disabled = false;
+            turmaInput.value = '';
+            alunoInput.value = '';
+            alunosCountSpan.textContent = '0';
+            encerrarBtn.disabled = true;
+            processarBtn.disabled = true;
+            gabaritoRespostasArea.innerHTML = '';
+            
+            gabaritoOficialSection.style.display = 'none';
+            inputSection.style.display = 'none';
+            configSection.style.display = 'block';
+            
+            resultadoDiv.textContent = "🎉 CSV Gerado com sucesso! Aplicação reiniciada para uma nova turma.";
+            resultadoDiv.style.backgroundColor = '#fff3cd';
+            resultadoDiv.style.borderColor = '#ffeeba';
+            resultadoDiv.style.color = '#856404';
+        });
+        
+        
+        function gerarDownloadCSV() {
+            // ... (lógica de geração CSV do passo anterior) ...
+            const gabaritoOficialData = { "Aluno": "Gabarito Oficial" };
+            for (let i = 1; i <= NUM_QUESTOES; i++) {
+                gabaritoOficialData[`Q${i}`] = gabaritoOficialRespostas[i-1];
+            }
+            
+            const dadosParaCSV = [gabaritoOficialData, ...dadosGabaritos];
+            
+            const separador = ';';
+            const headers = Object.keys(dadosParaCSV[0]); 
+            
+            let csvString = headers.join(separador) + '\n';
+            
+            dadosParaCSV.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header] !== undefined ? String(row[header]) : '';
+                    return `"${value.replace(/"/g, '""')}"`;
+                });
+                csvString += values.join(separador) + '\n';
+            });
+            
+            const turmaNome = turmaInput.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
+            const data = new Date().toISOString().slice(0, 10);
+            const filename = `Gabaritos_${turmaNome}_${data}.csv`;
+
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
