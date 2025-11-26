@@ -268,13 +268,20 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
 // >> FUNÇÃO: Monta o HTML 
 function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto }) {
     
+    // Calcula o total de alunos
+    const totalAlunos = relatorio_alunos.length;
+    
     // Processamento do texto de observações que agora vem limpo ou extraído do bloco ```text
     let obsTextoFinal = observacoesTexto;
 
     let htmlOutput = `
-        <h4 style="margin-top: 5px; color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+        <h4 style="margin-top: 5px; color: #6c757d; margin-bottom: 5px;">
             Total de Questões Analisadas para o Relatório: <strong>${totalQuestoes}</strong>
         </h4>
+        <h4 style="color: #6c757d; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-top: 5px;">
+            Total de Alunos: <strong>${totalAlunos}</strong>
+        </h4>
+        
         <h3>Relatório Detalhado por Aluno</h3>
         <hr>
     `;
