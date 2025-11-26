@@ -473,9 +473,13 @@
             const COL_WIDTH = TOTAL_RESPONSES_AREA_WIDTH / NUM_COLS;
             const ROW_HEIGHT = TOTAL_RESPONSES_AREA_HEIGHT / QUESTOES_POR_COLUNA;
             
-            // AJUSTE CRÍTICO: Limiar para considerar uma bolha preenchida (MAIS TOLERANTE POSSÍVEL)
-            // Aumentado para 200: aceita marcações muito mais claras.
+            // AJUSTE CRÍTICO 1: Limiar para considerar uma bolha preenchida (200 - tolerante)
             const THRESHOLD_FILL = 200; 
+
+            // AJUSTE CRÍTICO 2: Centralizado e menor (12x12 pixels) para evitar capturar bolhas vizinhas (evitar 'X')
+            const ROI_SIZE = 12; 
+            const y_center = y_q + (ROW_HEIGHT / 2); // Centro vertical da linha da questão
+
 
             // 4.2. Iterar sobre cada Questão e Alternativa
             for (let q = 0; q < NUM_QUESTOES; q++) {
@@ -493,8 +497,7 @@
                 const RESPONSE_AREA_WIDTH = COL_WIDTH * 0.6;
                 const BOLHA_WIDTH = RESPONSE_AREA_WIDTH / NUM_ALTERNATIVAS; 
                 
-                // AJUSTE DO ROI: Centralizado e menor (16x16 pixels)
-                const ROI_SIZE = 16; 
+                // AJUSTE DO ROI: Centralizado e menor (12x12 pixels)
                 const y_center = y_q + (ROW_HEIGHT / 2); // Centro vertical da linha da questão
 
                 for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
