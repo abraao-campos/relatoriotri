@@ -179,16 +179,34 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
             throw new Error("O relatório de alunos está vazio ou em formato inválido.");
         }
         
-        // 1. EXTRAÇÃO DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
+        // 1. EXTRAÇÃO ROBUSTA DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
         if (resumo_e_metricas) {
-            // <<< CORREÇÃO FINAL DA REGEX AQUI >>>
-            // Torna o fechamento ``` opcional e captura até o final da string (\s*$)
-            // Isso garante que o conteúdo do bloco 'text' seja capturado mesmo se o fechamento for omitido ou mal formatado.
+            let tempObsTexto = null;
+            
+            // TENTATIVA 1: O padrão mais robusto (```text até ```, sendo o fechamento opcional)
             const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)(?:```)?\s*$/i);
             
             if (obsMatch && obsMatch[1]) {
-                 // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
-                observacoesTexto = obsMatch[1].replace(/Observações Gerais:/i, '').trim();
+                tempObsTexto = obsMatch[1];
+            } else {
+                // TENTATIVA 2: Se a primeira falhar, tenta achar a âncora "Observações Gerais:" e pega tudo depois
+                const fallbackMatch1 = resumo_e_metricas.match(/Observações Gerais:\s*([\s\S]*)/i);
+                
+                if (fallbackMatch1 && fallbackMatch1[1]) {
+                    // Remove qualquer formatação ``` que possa ter sobrado
+                    tempObsTexto = fallbackMatch1[1].replace(/```text|```/ig, '');
+                } else {
+                    // TENTATIVA 3: Tenta achar ```text e pega tudo depois, sem se preocupar com o final
+                    const fallbackMatch2 = resumo_e_metricas.match(/```text\s*([\s\S]*)/i);
+                    if (fallbackMatch2 && fallbackMatch2[1]) {
+                         tempObsTexto = fallbackMatch2[1];
+                    }
+                }
+            }
+
+            if (tempObsTexto) {
+                // Limpa o texto final, removendo o título interno e espaços em branco
+                observacoesTexto = tempObsTexto.replace(/Observações Gerais:/i, '').trim();
             }
         }
         
