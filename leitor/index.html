@@ -449,7 +449,7 @@
             
             // ***PASSO CRUCIAL PARA CALIBRAÇÃO: EXIBE A IMAGEM CORRIGIDA***
             cv.imshow('process-canvas', warped); 
-            gabaritoPreview.src = processCanvas.toDataURL(); // Exibe a imagem corrigida no preview principal
+            gabaritoPreview.src = processCanvas.toToDataURL(); // Exibe a imagem corrigida no preview principal
             gabaritoPreview.style.borderColor = '#28a745'; // Borda verde para sucesso na correção
 
             // 4. LEITURA DE MARCAÇÕES (Detecção de Bolhas)
@@ -460,62 +460,56 @@
             
             // Calibração dos Espaços (Baseado no modelo de 2 colunas)
             const NUM_COLS = 2; // Duas colunas de questões
-            // CORREÇÃO DA VARIÁVEL: NUM_QUESTOES (SEM ACENTO)
             const QUESTOES_POR_COLUNA = NUM_QUESTOES / NUM_COLS; 
             
-            // NOVO AJUSTE: Largura e Altura da Área Total de Respostas (em pixels)
+            // AJUSTE: Largura e Altura da Área Total de Respostas (em pixels)
             const TOTAL_RESPONSES_AREA_WIDTH = OUTPUT_WIDTH * 0.84; // 84% de 600
             const TOTAL_RESPONSES_AREA_HEIGHT = OUTPUT_HEIGHT * 0.75; // 75% de 850
             
-            // NOVO AJUSTE: Offsets (em pixels)
-            // Distância em pixels da borda esquerda da imagem corrigida
+            // AJUSTE: Offsets (em pixels)
             const X_OFFSET = OUTPUT_WIDTH * 0.08; // 8%
-            // Distância em pixels da borda superior
             const Y_OFFSET = OUTPUT_HEIGHT * 0.15; // 15%
             
             const COL_WIDTH = TOTAL_RESPONSES_AREA_WIDTH / NUM_COLS;
             const ROW_HEIGHT = TOTAL_RESPONSES_AREA_HEIGHT / QUESTOES_POR_COLUNA;
             
-            // NOVO AJUSTE: Limiar para considerar uma bolha preenchida (mais rigoroso)
-            const THRESHOLD_FILL = 100; 
+            // AJUSTE CRÍTICO: Limiar para considerar uma bolha preenchida (MAIS TOLERANTE)
+            // Aumentado de 120 para 170.
+            const THRESHOLD_FILL = 170; 
 
             // 4.2. Iterar sobre cada Questão e Alternativa
             for (let q = 0; q < NUM_QUESTOES; q++) {
                 
-                // Determina a coluna (0 para Q1-Q25, 1 para Q26-Q50, etc.)
                 const col = Math.floor(q / QUESTOES_POR_COLUNA);
-                // Determina o índice da linha na coluna
                 const row = q % QUESTOES_POR_COLUNA; 
                 
-                let maiorEscuridao = 255; // Branco puro
-                let respostaAluno = 'B'; // 'B' = Branco/Não marcado (Padrão inicial)
-                let multiMarcacao = false;
+                let respostaAluno = 'B'; 
+                let marcacoesEncontradas = []; 
                 
                 // Coordenadas iniciais (superior esquerda) para a área da QUESTÃO 'q'
                 const x_q = X_OFFSET + (col * COL_WIDTH);
                 const y_q = Y_OFFSET + (row * ROW_HEIGHT);
                 
-                // Largura reservada para as 5 bolhas de resposta (aproximadamente 60% da COL_WIDTH)
                 const RESPONSE_AREA_WIDTH = COL_WIDTH * 0.6;
-                const BOLHA_WIDTH = RESPONSE_AREA_WIDTH / NUM_ALTERNATIVAS; // Largura aproximada por bolha
+                const BOLHA_WIDTH = RESPONSE_AREA_WIDTH / NUM_ALTERNATIVAS; 
                 
-                let marcacoesEncontradas = []; // Para detectar múltiplas marcações
-                
+                // AJUSTE DO ROI: Centralizado e menor (16x16 pixels)
+                const ROI_SIZE = 16; 
+                const y_center = y_q + (ROW_HEIGHT / 2); // Centro vertical da linha da questão
+
                 for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
                     
                     // Posição central X esperada da bolha 'a'
                     const x_center = x_q + (BOLHA_WIDTH * (a + 0.5));
                     
-                    // Criar um retângulo pequeno (ROI) no centro da bolha (ajustar os 10/20 pixels conforme o tamanho)
-                    // Altura da bolha deve estar centralizada na linha (ROW_HEIGHT)
                     let bolhaRect = new cv.Rect(
-                        x_center - 10,  // X inicial
-                        y_q + (ROW_HEIGHT / 2) - 10, // Y inicial (meio da linha)
-                        20,             // Largura (20px)
-                        20              // Altura (20px)
+                        x_center - (ROI_SIZE / 2),  // X inicial
+                        y_center - (ROI_SIZE / 2), // Y inicial 
+                        ROI_SIZE,             // Largura 
+                        ROI_SIZE              // Altura 
                     );
                     
-                    // Garante que o ROI não saia dos limites (embora o warpPerspective ajude)
+                    // Garante que o ROI não saia dos limites
                     bolhaRect.x = Math.max(0, bolhaRect.x);
                     bolhaRect.y = Math.max(0, bolhaRect.y);
                     bolhaRect.width = Math.min(warped.cols - bolhaRect.x, bolhaRect.width);
@@ -525,26 +519,19 @@
                     let mediaCor = cv.mean(bubbleROI)[0]; 
                     bubbleROI.delete();
                     
-                    // Se estiver abaixo do limiar, é uma marcação
+                    // Se estiver abaixo do limiar (mais escuro), é uma marcação
                     if (mediaCor < THRESHOLD_FILL) {
                         marcacoesEncontradas.push({
                             alt: alternativas[a],
                             escuridao: mediaCor
                         });
                     }
-                    
-                    // Acompanha o mais escuro (método de fallback)
-                    if (mediaCor < maiorEscuridao) {
-                        maiorEscuridao = mediaCor;
-                        // Não precisamos mais desta variável, pois a lógica de detecção de marcaçõesEncontradas é superior.
-                        // respostaAluno = alternativas[a];
-                    }
                 }
                 
                 // 5. Regra de Decisão Final
                 
                 if (marcacoesEncontradas.length > 1) {
-                    // Múltipla marcação (duas ou mais bolhas preenchidas)
+                    // Múltipla marcação
                     respostaAluno = 'X'; 
                 } else if (marcacoesEncontradas.length === 1) {
                     // Marcação única encontrada
