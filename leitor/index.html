@@ -478,7 +478,6 @@
 
             // AJUSTE CRÍTICO 2: Centralizado e menor (12x12 pixels) para evitar capturar bolhas vizinhas (evitar 'X')
             const ROI_SIZE = 12; 
-            const y_center = y_q + (ROW_HEIGHT / 2); // Centro vertical da linha da questão
 
 
             // 4.2. Iterar sobre cada Questão e Alternativa
@@ -492,12 +491,12 @@
                 
                 // Coordenadas iniciais (superior esquerda) para a área da QUESTÃO 'q'
                 const x_q = X_OFFSET + (col * COL_WIDTH);
-                const y_q = Y_OFFSET + (row * ROW_HEIGHT);
+                const y_q = Y_OFFSET + (row * ROW_HEIGHT); // AQUI! y_q está definida.
                 
                 const RESPONSE_AREA_WIDTH = COL_WIDTH * 0.6;
                 const BOLHA_WIDTH = RESPONSE_AREA_WIDTH / NUM_ALTERNATIVAS; 
                 
-                // AJUSTE DO ROI: Centralizado e menor (12x12 pixels)
+                // CÁLCULO CORRETO: y_center é calculado APÓS y_q estar definido.
                 const y_center = y_q + (ROW_HEIGHT / 2); // Centro vertical da linha da questão
 
                 for (let a = 0; a < NUM_ALTERNATIVAS; a++) {
