@@ -1,84 +1,71 @@
-const jsonMatch = jsonString.match(/```json\n([\s\S]*)\n```/);
-            if (jsonMatch) {
-                jsonString = jsonMatch[1].trim();
-            }
+const { GoogleGenAI } = require('@google/genai');
+// Força a utilização da variável de ambiente CHAVE
+const ai = new GoogleGenAI({ 
+    apiKey: process.env.GEMINI_API_KEY 
+});
 
-            // O Gemini, com responseMimeType: application/json, às vezes envia apenas o JSON limpo.
-            let relatorioParcial;
-            try {
-                relatorioParcial = JSON.parse(jsonString);
-            } catch (jsonError) {
-                console.error("Erro ao parsear JSON:", jsonError, "Resposta bruta:", fullText);
-                throw new Error(`A API do Gemini retornou um formato inválido de JSON no Lote ${i + 1}.`);
-            }
-            
-            // O restante da lógica de extração das métricas/observações permanece inalterada
-            // Como usamos responseMimeType, o Gemini DEVE retornar apenas o JSON.
-            // A observação textual será ignorada por este handler forçando o JSON, 
-            // e será adicionada ao prompt do segundo lote se necessário, ou em uma chamada separada se o lote for único.
+// --- Função Helper: Chunking ---
+function chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
 
-            // Para simplificar, vou assumir que faremos UMA chamada para o Gemini com TODOS os dados
-            // e que o chunking só é necessário para a observação final, o que não é o caso aqui.
+// --- Handler Principal (Exportação) ---
+module.exports = async (req, res) => {
+    
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: "Método não permitido. Use POST." });
+    }
 
-            // VOU REVERTER PARA UMA ÚNICA CHAMADA SEM CHUNKING PARA SIMPLICIDADE E EFICIÊNCIA
-            // se o número de alunos for <= 100. Se for maior, o chunking exige lógica de agregação complexa que vou evitar.
+    try {
+        // VERIFICAÇÃO ADICIONAL: Verifica se a chave foi carregada antes de qualquer chamada API
+        if (!process.env.GEMINI_API_KEY) {
+             throw new Error("Variável de ambiente GEMINI_API_KEY não está definida. Verifique a configuração do seu host.");
+        }
+        
+        // --- 1. Extração de Dados ---
+        const { resultadosContent, resultadosFilename } = req.body;
+        const alunosOriginal = JSON.parse(resultadosContent);
 
-            // VAMOS REVERTER O PLANO DE CHUNKING PARA SIMPLIFICAR E ATENDER A MAIORIA DOS CASOS (até 100 alunos)
-
-            if (chunksAlunos.length > 1) {
-                throw new Error("O sistema de análise por lotes é complexo e foi desativado temporariamente. O limite é de 100 alunos. Por favor, divida o arquivo CSV.");
-            }
-
-            // Se for um único lote, o relatorioFinalDetalhado é o relatorioParcial.
-            relatorioFinalDetalhado = relatorioParcial;
-
-            // Para a observação, faremos uma chamada SEPARADA para garantir que o JSON seja limpo.
-            const observacaoPrompt = `Com base na análise JSON que você acabou de gerar (não a repita), forneça uma observação concisa, em 1-2 parágrafos, sobre os principais pontos fracos e fortes da turma (média, desvio, questões mais difíceis, distratores).
-            
-Dados de Acertos (Nome (Acertos/Total)): ${alunosData}
-Métricas Chave: Média ${media.toFixed(2)}, Maior ${maior}, Menor ${menor}`;
-
-            const observacaoResponse = await ai.models.generateContent({
-                model: MODEL_NAME,
-                contents: [{ parts: [{ text: observacaoPrompt }] }],
-                config: {
-                    temperature: 0.5,
-                    systemInstruction: {
-                        parts: [{ text: "Você é um analista educacional. Sua única tarefa é escrever uma observação coesa em 1-2 parágrafos. Sua resposta não deve conter o bloco JSON nem formatação (markdown) além de quebras de linha." }]
-                    }
-                }
-            });
-
-            const observacaoText = observacaoResponse.text;
-            relatoriosObservacoes.push(observacaoText);
+        if (alunosOriginal.length === 0) {
+            return res.status(400).json({ success: false, error: "O arquivo de resultados não contém dados após a conversão." });
         }
 
-        // --- 5. Montagem da Resposta Final ---
+        const gabaritoOficial = alunosOriginal[0];
+        const alunosParaCorrigir = alunosOriginal.slice(1);
+        const totalQuestoes = Object.keys(gabaritoOficial).length - 1;
+
+        if (alunosParaCorrigir.length === 0) {
+            return res.status(400).json({ success: false, error: "O arquivo não contém marcações de alunos para corrigir." });
+        }
+
+        // --- 2. Chunking e Processamento do Gemini ---
+        const alunoChunks = chunkArray(alunosParaCorrigir, 15);
+        let relatorioFinalDetalhado = [];
+        let relatoriosObservacoes = [];
         
-        // Converte o JSON final de volta para o formato de string Markdown que o frontend espera.
-        const relatorioJSONCompleto = `\`\`\`json\n${JSON.stringify(relatorioFinalDetalhado, null, 2)}\n\`\`\``;
-        
-        // Concatena o JSON e as observações textuais
-        const relatorioFinalCompleto = relatorioJSONCompleto + "\n\n" + relatoriosObservacoes.join('\n');
-
-        // Retorna a resposta de sucesso com status 200
-        return res.status(200).json({
-            success: true,
-            analysis: relatorioFinalCompleto, 
-            error: null 
-        });
-
-    } catch (e) {
-        // Captura qualquer erro não tratado e formata como JSON de erro
-        
-        const statusCode = (e.message.includes("não contém dados") || e.message.includes("CSV deve ter o Gabarito") || e.message.includes("não está definida")) ? 400 : 500;
-
-        console.error(`ERRO CRÍTICO NO HANDLER (Status ${statusCode}):`, e.message);
-
-        return res.status(statusCode).json({
-            success: false,
-            analysis: null, 
-            error: e.message
-        });
-    }
-};
+        for (let i = 0; i < alunoChunks.length; i++) {
+            const chunk = alunoChunks[i];
+            const chunkData = [gabaritoOficial, ...chunk];
+            const chunkJsonString = JSON.stringify(chunkData, null, 2);
+            
+            let prompt;
+            if (i === 0) {
+                // Prompt completo para o primeiro lote
+                prompt = `Você é um Analista de Desempenho Escolar.
+Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
+**Instruções de Saída:**
+                1. **Correção Detalhada (Bloco JSON):** Gere um Array JSON chamado 'relatorio_alunos' para CADA ALUNO corrigido neste bloco.
+O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador).
+O campo "Total_Questoes" deve ser **${totalQuestoes}**.
+                2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
+3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
+Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média de Acertos:** [...] **Maior Pontuação:** [...] **Menor Pontuação:** [...] \`\`\`text Observações Gerais: [...] \`\`\`
+                
+                **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
+            } else {
+                // Prompt simplificado (APENAS
