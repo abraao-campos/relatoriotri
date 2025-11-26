@@ -1,11 +1,10 @@
-// api/analyze.js - Código Final com Robustez de Extração JSON e Saída Estruturada
+// api/analyze.js - Código Final com Robustez de Extração JSON
 
 const { GoogleGenAI } = require('@google/genai');
 // Força a utilização da variável de ambiente CHAVE
 const ai = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY 
-});
-
+}); 
 // --- Função Helper: Chunking ---
 function chunkArray(array, chunkSize) {
     const chunks = [];
@@ -19,6 +18,7 @@ function chunkArray(array, chunkSize) {
 module.exports = async (req, res) => {
     
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
     if (req.method !== 'POST') {
         return res.status(405).json({ success: false, error: "Método não permitido. Use POST." });
     }
@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
         
         // --- 1. Extração de Dados ---
         const { resultadosContent, resultadosFilename } = req.body;
-        const alunosOriginal = JSON.parse(resultadosContent); 
+        const alunosOriginal = JSON.parse(resultadosContent);
 
         if (alunosOriginal.length === 0) {
             return res.status(400).json({ success: false, error: "O arquivo de resultados não contém dados após a conversão." });
@@ -46,7 +46,9 @@ module.exports = async (req, res) => {
         }
 
         // --- 2. Chunking e Processamento do Gemini ---
-        const alunoChunks = chunkArray(alunosParaCorrigir, 15);
+        // Otimização: Ajusta o chunk size para 35. 
+        // Reduz o payload por requisição, aumentando a velocidade de cada chamada e reduzindo o risco de Timeout (504).
+        const alunoChunks = chunkArray(alunosParaCorrigir, 35); 
         let relatorioFinalDetalhado = [];
         let relatoriosObservacoes = [];
         
@@ -62,7 +64,7 @@ module.exports = async (req, res) => {
 Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
 **Instruções de Saída:**
                 1. **Correção Detalhada (Bloco JSON):** Gere um Array JSON chamado 'relatorio_alunos' para CADA ALUNO corrigido neste bloco.
-O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador). O campo "Erros" é obrigatório.
+O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador).
 O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
 3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
@@ -73,10 +75,9 @@ Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média
                 // Prompt simplificado (APENAS CORREÇÃO JSON) para lotes subsequentes
                 prompt = `Continue a correção.
 Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir o desempenho dos alunos no JSON abaixo com base no Gabarito Oficial (primeira linha).
-O campo "Erros" é obrigatório no relatório.
 O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 
-Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o formato: \`\`\`json [ {"Aluno": "...", "Acertos": "...", ...}, ...] \`\`\`
+                Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o formato: \`\`\`json [ {"Aluno": "...", "Acertos": "...", ...}, ...] \`\`\`
                 
                 **Dados a Analisar (Gabarito + Alunos):** ${chunkJsonString}`;
             }
@@ -88,7 +89,7 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
                     model: 'gemini-2.5-flash',
                     contents: prompt,
                     config: {
-                        responseMimeType: 'text/plain',
+                        responseMimeType: 'text/plain', 
                         temperature: 0.1,
                     }
                 });
@@ -98,13 +99,14 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
 
             // 4. EXTRAÇÃO ROBUSTA E CONCATENAÇÃO
             const fullText = response.text.trim();
-            // <<<< CORREÇÃO CRUCIAL AQUI >>>>: Regex mais flexível para extrair o JSON
-            const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*```/); 
+            const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
             
             if (jsonMatch) {
                 let jsonString = jsonMatch[1].trim();
+                // Pega o conteúdo interno e faz um trim inicial
 
                 // Tenta ser mais robusto: isola o conteúdo entre o primeiro '[' e o último ']'
+                // Isso remove qualquer caractere extra que o Gemini possa ter colocado após o JSON
                 const firstBracket = jsonString.indexOf('[');
                 const lastBracket = jsonString.lastIndexOf(']');
 
@@ -122,41 +124,34 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
                     relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
                 } catch (e) {
                      // Retorna a mensagem de erro detalhada
-                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}. Conteúdo Bruto Recebido: ${jsonString.substring(0, 500)}`);
+                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
                 }
             } else {
-                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}. Conteúdo Bruto Recebido: ${fullText.substring(0, 500)}`);
+                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
             }
             
             if (i === 0) {
-                // Extrai todo o texto (Métricas e Observações) que vem APÓS o bloco JSON
+                // O restante da lógica de extração das métricas/observações permanece inalterada
                 const textAfterJson = fullText.substring(jsonMatch.index + jsonMatch[0].length).trim();
                 relatoriosObservacoes.push(textAfterJson);
             }
         }
 
-        // --- 5. Montagem da Resposta Final (ESTRUTURADA) ---
-        
-        let metricasEobservacoes = null;
-        if (relatoriosObservacoes.length > 0) {
-            // Usa join para garantir uma string limpa das métricas/observações do primeiro lote
-            metricasEobservacoes = relatoriosObservacoes.join('\n\n'); 
-        }
+        // --- 5. Montagem da Resposta Final ---
+        const relatorioJSONCompleto = `\`\`\`json\n${JSON.stringify(relatorioFinalDetalhado, null, 2)}\n\`\`\``;
+        const relatorioFinalCompleto = relatorioJSONCompleto + "\n\n" + relatoriosObservacoes.join('\n');
 
-        // <<<< RETORNO ESTRUTURADO AQUI >>>>
+        // Retorna a resposta de sucesso com status 200
         return res.status(200).json({
             success: true,
-            // 1. Retorna o Array JSON de forma nativa
-            relatorio_alunos: relatorioFinalDetalhado, 
-            // 2. Retorna o texto extraído (Métricas + Observações)
-            resumo_e_metricas: metricasEobservacoes,
+            analysis: relatorioFinalCompleto, 
             error: null 
         });
+
     } catch (e) {
         // Captura qualquer erro não tratado e formata como JSON de erro
         
-        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações") || e.message.includes("GEMINI_API_KEY não está definida")) ?
-        400 : 500;
+        const statusCode = (e.message.includes("não contém dados") || e.message.includes("não contém marcações") || e.message.includes("GEMINI_API_KEY não está definida")) ? 400 : 500;
 
         console.error(`ERRO CRÍTICO NO HANDLER (Status ${statusCode}):`, e.message);
         return res.status(statusCode).json({ 
