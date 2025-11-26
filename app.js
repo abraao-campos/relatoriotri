@@ -180,8 +180,10 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
         
         // 1. EXTRAÇÃO DE OBSERVAÇÕES E MÉTRICAS DO TEXTO ÚNICO 'resumo_e_metricas'
         if (resumo_e_metricas) {
-            // Encontra e extrai o bloco ```text [...] ```
-            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)\n```/i);
+            // <<<< CORREÇÃO CRUCIAL DA REGEX AQUI >>>>
+            // Regex mais flexível para capturar o bloco 'text' até o fechamento ```,
+            // (.*?)\s*``` captura qualquer conteúdo até o fechamento ``` opcionalmente precedido por espaços/quebras de linha.
+            const obsMatch = resumo_e_metricas.match(/```text\s*([\s\S]*?)\s*```/i);
             
             if (obsMatch && obsMatch[1]) {
                  // Remove o título "Observações Gerais:" que pode estar dentro do bloco de texto
@@ -228,7 +230,7 @@ function formatAnalysisOutput(relatorio_alunos, resumo_e_metricas) {
 }
 
 
-// >> FUNÇÃO: Monta o HTML (COM CORREÇÃO DE ROBUSTEZ)
+// >> FUNÇÃO: Monta o HTML 
 function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes, observacoesTexto }) {
     
     // Processamento do texto de observações que agora vem limpo ou extraído do bloco ```text
@@ -243,79 +245,7 @@ function formatHtmlOutput({ relatorio_alunos, media, maior, menor, totalQuestoes
     `;
 // Formata o relatório por aluno
     relatorio_alunos.forEach(aluno => {
-        // <<<< CORREÇÃO DE ROBUSTEZ AQUI >>>>
-        // Usa o valor do backend, ou "0,00" se for null/undefined (para evitar o erro .replace)
+        // CORREÇÃO DE ROBUSTEZ: Usa o valor do backend, ou "0,00" se for null/undefined (para evitar o erro .replace)
         const percentualAcertoSeguro = aluno.Percentual_Acerto || "0,00"; 
         
-        const percent = parseFloat(percentualAcertoSeguro.replace(',', '.')); // Chama replace em um valor seguro
-        const color = percent >= 80 ? '#28a745' : percent >= 50 ? '#ffc107' : '#dc3545'; 
-
-        htmlOutput += `
-            <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff;">
-           
-            <h4 style="margin-top: 0; color: ${color};">${aluno.Aluno}</h4>
-                <ul style="list-style-type: none; padding: 0;">
-                    <li><strong>✅ Acertos:</strong> <span style="color: #28a745;">${aluno.Acertos}</span></li>
-                    <li><strong>❌ Erros:</strong> <span style="color: #dc3545;">${aluno.Erros}</span></li>
-                    <li><strong>% de Acerto:</strong> 
-            <strong style="color: ${color};">${aluno.Percentual_Acerto || '0,00'}%</strong></li>
-                </ul>
-            </div>
-        `;
-    });
-    
-    // Limpa o texto de observações e converte para HTML (para aceitar texto corrido ou bullet points)
-    let observacoesHtml = obsTextoFinal
-        .replace(/^(<br>|\s)+/g, '') // Remove quebras de linha no início
-        .replace(/\*/g, '•') // Converte * em •
-        .replace(/\n/g, '<br>') // Converte \n em <br>
-        .trim();
-    htmlOutput += `
-        <br>
-        <h3>Análise Geral de Desempenho da Turma</h3>
-        
-        <div style="border: 1px solid #007bff; padding: 20px; border-radius: 8px; background-color: #eaf5ff;">
-            <h4 style="color: #007bff; margin-top: 0; border-bottom: 1px solid #007bff; padding-bottom: 10px;">
-                Resumo Executivo da Turma
-          
-            </h4>
-            
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-                 
-                <strong style="color: #007bff;">Média de Acertos</strong>
-                    <h4 style="margin: 0; color: #007bff;">${media} Acertos</h4>
-                </div>
-                
-                <div style="background-color: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: #28a745;">Maior Pontuação</strong>
-                    <h4 style="margin: 0;
-            color: #28a745;">${maior} Acertos</h4>
-                </div>
-                
-                <div style="background-color: #fff;
-            padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between;
-            align-items: center;">
-                    <strong style="color: #dc3545;">Menor Pontuação</strong>
-                    <h4 style="margin: 0;
-            color: #dc3545;">${menor} Acertos</h4>
-                </div>
-            </div>
-
-            <div style="background-color: #fff;
-            padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                <strong style="display: block;
-            margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">Relatório de Desempenho (Observações Gerais):</strong>
-                <div style="padding-left: 5px;
-            color: #555;">
-                    ${observacoesHtml}
-                </div>
-            </div>
-
-        </div>
-    `;
-    
-    return htmlOutput;
-}
+        const percent = parseFloat(
