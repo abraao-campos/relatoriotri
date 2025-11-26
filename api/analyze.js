@@ -1,3 +1,5 @@
+// api/analyze.js - Código Final com Robustez de Extração JSON e Saída Estruturada
+
 const { GoogleGenAI } = require('@google/genai');
 // Força a utilização da variável de ambiente CHAVE
 const ai = new GoogleGenAI({ 
@@ -29,7 +31,6 @@ module.exports = async (req, res) => {
         
         // --- 1. Extração de Dados ---
         const { resultadosContent, resultadosFilename } = req.body;
-        // ** Ponto de falha mais provável: Se resultadosContent não for um JSON string válido, o código para aqui.
         const alunosOriginal = JSON.parse(resultadosContent); 
 
         if (alunosOriginal.length === 0) {
@@ -38,7 +39,7 @@ module.exports = async (req, res) => {
 
         const gabaritoOficial = alunosOriginal[0];
         const alunosParaCorrigir = alunosOriginal.slice(1);
-        const totalQuestoes = Object.keys(gabaritoOficial).length - 1;
+        const totalQuestoes = Object.keys(gabaritoOficial).length - 1; 
 
         if (alunosParaCorrigir.length === 0) {
             return res.status(400).json({ success: false, error: "O arquivo não contém marcações de alunos para corrigir." });
@@ -61,7 +62,7 @@ module.exports = async (req, res) => {
 Sua tarefa é corrigir e analisar o desempenho dos alunos com base no Gabarito Oficial fornecido na primeira linha do JSON.
 **Instruções de Saída:**
                 1. **Correção Detalhada (Bloco JSON):** Gere um Array JSON chamado 'relatorio_alunos' para CADA ALUNO corrigido neste bloco.
-O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador).
+O Array deve conter as chaves: "Aluno", "Acertos", "Erros", "Percentual_Acerto" (formatado com 2 casas decimais e vírgula como separador). O campo "Erros" é obrigatório.
 O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 2. **Métricas Chave (Próxima Seção):** Calcule e liste a Média, a Maior e a Menor Pontuação de Acertos APENAS para os alunos neste lote.
 3. **Observações Gerais (Bloco TEXT):** APENAS no primeiro lote (Chunk 0), forneça uma análise qualitativa detalhada de 300 palavras sobre o desempenho geral da turma, identificando pontos fortes e fracos, e sugerindo intervenções pedagógicas.
@@ -72,6 +73,7 @@ Siga **EXATAMENTE** este formato para a saída: \`\`\`json [...] \`\`\` **Média
                 // Prompt simplificado (APENAS CORREÇÃO JSON) para lotes subsequentes
                 prompt = `Continue a correção.
 Você é um Analista de Desempenho Escolar. Sua tarefa é corrigir o desempenho dos alunos no JSON abaixo com base no Gabarito Oficial (primeira linha).
+O campo "Erros" é obrigatório no relatório.
 O campo "Total_Questoes" deve ser **${totalQuestoes}**.
                 
 Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o formato: \`\`\`json [ {"Aluno": "...", "Acertos": "...", ...}, ...] \`\`\`
@@ -86,7 +88,6 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
                     model: 'gemini-2.5-flash',
                     contents: prompt,
                     config: {
-                 
                         responseMimeType: 'text/plain',
                         temperature: 0.1,
                     }
@@ -97,14 +98,13 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
 
             // 4. EXTRAÇÃO ROBUSTA E CONCATENAÇÃO
             const fullText = response.text.trim();
-            const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+            // <<<< CORREÇÃO CRUCIAL AQUI >>>>: Regex mais flexível para extrair o JSON
+            const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*```/); 
             
             if (jsonMatch) {
                 let jsonString = jsonMatch[1].trim();
-                // Pega o conteúdo interno e faz um trim inicial
 
                 // Tenta ser mais robusto: isola o conteúdo entre o primeiro '[' e o último ']'
-                // Isso remove qualquer caractere extra que o Gemini possa ter colocado após o JSON
                 const firstBracket = jsonString.indexOf('[');
                 const lastBracket = jsonString.lastIndexOf(']');
 
@@ -122,10 +122,10 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
                     relatorioFinalDetalhado = relatorioFinalDetalhado.concat(chunkRelatorio);
                 } catch (e) {
                      // Retorna a mensagem de erro detalhada
-                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}`);
+                     throw new Error(`Erro de parsing do JSON no Lote ${i + 1}. O Gemini retornou um JSON inválido. Detalhe: ${e.message}. Conteúdo Bruto Recebido: ${jsonString.substring(0, 500)}`);
                 }
             } else {
-                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}.`);
+                throw new Error(`O Gemini não retornou o bloco \`\`\`json\`\`\` no Lote ${i + 1}. Conteúdo Bruto Recebido: ${fullText.substring(0, 500)}`);
             }
             
             if (i === 0) {
@@ -143,7 +143,7 @@ Sua saída deve conter **APENAS** o Array JSON 'relatorio_alunos' seguindo o for
             metricasEobservacoes = relatoriosObservacoes.join('\n\n'); 
         }
 
-        // Retorna a resposta de sucesso com status 200
+        // <<<< RETORNO ESTRUTURADO AQUI >>>>
         return res.status(200).json({
             success: true,
             // 1. Retorna o Array JSON de forma nativa
