@@ -18,7 +18,7 @@
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            max-width: 800px; /* Aumentado para acomodar 5 colunas */
+            max-width: 800px; 
             width: 100%;
             text-align: center;
             margin-bottom: 20px;
@@ -75,7 +75,7 @@
             text-align: left;
         }
         #input-section { display: none; }
-        /* ALTERAÇÃO 1: Layout de 5 em 5 para o Gabarito Oficial */
+        /* Layout de 5 em 5 para o Gabarito Oficial */
         #gabarito-respostas-area {
             display: grid;
             grid-template-columns: repeat(5, 1fr); 
@@ -104,8 +104,8 @@
             text-align: left;
         }
         #btn-confirmar-leitura { background-color: #28a745; color: white; }
-        #btn-reenviar-imagem { background-color: #ffc107; color: #333; margin-left: 10px; }
-        #btn-corrigir-manual { background-color: #ffc107; color: #333; } /* Estilo para o novo botão */
+        #btn-reenviar-imagem { background-color: #ffc107; color: #333; } 
+        #btn-corrigir-manual { background-color: #ffc107; color: #333; } 
         
         /* Nova Área de Correção Manual */
         #correcao-manual-area {
@@ -119,6 +119,20 @@
             display: grid; 
             grid-template-columns: repeat(5, 1fr); 
             gap: 10px;
+        }
+        /* NOVO CSS: Esconder o grupo de botões de confirmação/reenvio durante a edição */
+        .confirmation-buttons-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        /* Garante que o Confirmar Leitura seja visível mesmo na edição */
+        .correction-buttons-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -163,18 +177,22 @@
                 <p>Verifique abaixo se as respostas lidas pela IA estão corretas (Exibição: 5 questões por linha):</p>
                 <div id="leitura-confirmacao-respostas"></div>
                 
-                <div class="button-group" style="margin-top: 15px;">
-                    <button id="btn-confirmar-leitura">✅ Confirmar Leitura Correta</button>
+                <div id="confirmation-buttons-row" class="confirmation-buttons-row">
+                    <button id="btn-confirmar-leitura-normal" style="background-color: #28a745; color: white;">✅ Confirmar Leitura Correta</button>
                     <button id="btn-corrigir-manual">✍️ Corrigir Leitura (Manual)</button> 
                     <button id="btn-reenviar-imagem">🔄 Reenviar Imagem</button>
                 </div>
-            </div>
-            <div id="correcao-manual-area">
-                <h4>Edição Manual de Respostas:</h4>
-                <div id="inputs-correcao-manual">
+                
+                <div id="correcao-manual-area">
+                    <h4>Edição Manual de Respostas:</h4>
+                    <div id="inputs-correcao-manual">
+                        </div>
+                    <div id="correction-buttons-row" class="correction-buttons-row">
+                        <button id="btn-confirmar-leitura-manual" style="background-color: #007bff; color: white;">💾 Salvar e Confirmar Alterações</button>
                     </div>
-            </div>
+                </div>
 
+            </div>
             <p style="margin-top: 15px; text-align: center; color: #6c757d;">Alunos processados: <span id="alunos-count">0</span></p>
 
             <button id="encerrar-gabaritos" disabled>Encerrar Gabaritos da Turma (Gerar CSV)</button>
@@ -203,14 +221,17 @@
         const iniciarLeituraBtn = document.getElementById('btn-iniciar-leitura');
         const inputSection = document.getElementById('input-section');
         
-        // Novos elementos de confirmação e correção
+        // Elementos de confirmação e correção
         const leituraConfirmacaoDiv = document.getElementById('leitura-confirmacao');
         const confirmacaoRespostasDiv = document.getElementById('leitura-confirmacao-respostas');
-        const confirmarLeituraBtn = document.getElementById('btn-confirmar-leitura');
+        const confirmarLeituraNormalBtn = document.getElementById('btn-confirmar-leitura-normal'); // Botão normal
+        const confirmarLeituraManualBtn = document.getElementById('btn-confirmar-leitura-manual'); // NOVO: Botão para salvar após edição
         const reenviarImagemBtn = document.getElementById('btn-reenviar-imagem');
-        const corrigirManualBtn = document.getElementById('btn-corrigir-manual'); // NOVO
-        const correcaoManualArea = document.getElementById('correcao-manual-area'); // NOVO
-        const inputsCorrecaoManual = document.getElementById('inputs-correcao-manual'); // NOVO
+        const corrigirManualBtn = document.getElementById('btn-corrigir-manual'); 
+        const correcaoManualArea = document.getElementById('correcao-manual-area'); 
+        const inputsCorrecaoManual = document.getElementById('inputs-correcao-manual'); 
+        const confirmationButtonsRow = document.getElementById('confirmation-buttons-row'); // Linha de botões normal
+        const correctionButtonsRow = document.getElementById('correction-buttons-row'); // Linha de botões de edição
 
 
         // Variáveis de Estado
@@ -222,7 +243,7 @@
         // Estado temporário para a confirmação
         let alunoEmProcessamento = '';
         let respostasTemporarias = {};
-        let isProcessing = false; // Flag para evitar processamento duplicado
+        let isProcessing = false; 
 
         // --- FUNÇÃO HELPER: LER ARQUIVO COMO BASE64 ---
         function getFileAsBase64(file) {
@@ -314,7 +335,6 @@
 
         // --- C. LÓGICA DE INPUT E INÍCIO DE PROCESSAMENTO AUTOMÁTICO ---
         
-        // Escuta o input de nome para iniciar o processo se o arquivo já estiver lá
         alunoInput.addEventListener('input', function() {
             const alunoValido = alunoInput.value.trim() !== '';
             const imagemSelecionada = gabaritoInput.files && gabaritoInput.files.length > 0;
@@ -324,7 +344,6 @@
                 resultadoDiv.style.backgroundColor = '#d4edda';
                 resultadoDiv.style.borderColor = '#c3e6cb';
                 resultadoDiv.style.color = '#155724';
-                // Chama a análise imediatamente após o nome ser preenchido (se a imagem já está lá)
                 setTimeout(processarGabaritoImediatamente, 50);
             } else if (imagemSelecionada && !alunoValido) {
                  resultadoDiv.textContent = "Nome do aluno ausente. Por favor, preencha o nome para iniciar o processamento automático.";
@@ -333,7 +352,6 @@
             }
         });
 
-        // Listener PRINCIPAL: Carregamento do Arquivo (inicia o processamento)
         gabaritoInput.addEventListener('change', function() {
             const file = this.files[0];
             const alunoValido = alunoInput.value.trim() !== '';
@@ -351,7 +369,6 @@
                     resultadoDiv.style.backgroundColor = '#d4edda';
                     resultadoDiv.style.borderColor = '#c3e6cb';
                     resultadoDiv.style.color = '#155724';
-                    // Chama a análise imediatamente após o arquivo ser selecionado (se o nome já está lá)
                     setTimeout(processarGabaritoImediatamente, 50); 
                 } else if (!alunoValido) {
                      resultadoDiv.textContent = "Nome do aluno ausente. Por favor, preencha o nome para iniciar o processamento automático.";
@@ -366,12 +383,10 @@
             }
         });
 
-        // Função vazia
         function validarFormularioAluno() { }
         
-        // LÓGICA DE PROCESSAMENTO (FUNÇÃO INDEPENDENTE)
         async function processarGabaritoImediatamente() {
-            if (isProcessing) return; // Evita múltiplas execuções
+            if (isProcessing) return; 
             
             isProcessing = true;
             encerrarBtn.disabled = true; 
@@ -440,7 +455,6 @@
         // --- D. LÓGICA DE CONFIRMAÇÃO E REENVIO/CORREÇÃO ---
 
         function showConfirmationUI(aluno, respostas) {
-            // Esconde os elementos de input e processamento
             alunoInput.disabled = true; 
             gabaritoInput.disabled = true;
             
@@ -448,13 +462,17 @@
             correcaoManualArea.style.display = 'none'; 
             inputsCorrecaoManual.innerHTML = '';
             
-            // Formata as respostas em 5 colunas para visualização (Alteração 1)
+            // Garante que os botões normais estejam visíveis e o de correção escondido
+            confirmationButtonsRow.style.display = 'flex';
+            correctionButtonsRow.style.display = 'none';
+            
+            // Formata as respostas em 5 colunas para visualização
             const respostasLidas = Object.entries(respostas);
             let respostasFormatadas = '';
             for (let i = 0; i < respostasLidas.length; i++) {
                 const [q, r] = respostasLidas[i];
                 respostasFormatadas += `${q}: ${r.padEnd(2, ' ')} `;
-                if ((i + 1) % 5 === 0) { // Quebra de linha a cada 5 questões
+                if ((i + 1) % 5 === 0) { 
                     respostasFormatadas += '\n'; 
                 }
             }
@@ -469,21 +487,25 @@
             leituraConfirmacaoDiv.style.display = 'block';
         }
 
-        confirmarLeituraBtn.addEventListener('click', confirmarLeitura);
+        // EVENT LISTENERS
+        confirmarLeituraNormalBtn.addEventListener('click', () => confirmarLeitura(false));
+        confirmarLeituraManualBtn.addEventListener('click', () => confirmarLeitura(true));
         reenviarImagemBtn.addEventListener('click', reenviarImagem);
-        corrigirManualBtn.addEventListener('click', corrigirLeituraManual); // NOVO LISTENER
+        corrigirManualBtn.addEventListener('click', corrigirLeituraManual); 
 
-        // NOVO: Função para iniciar a correção manual
         function corrigirLeituraManual() {
-            // Esconde a visualização normal e mostra a área de inputs de correção
-            leituraConfirmacaoDiv.style.display = 'none'; // Esconde a div principal por um momento
+            // Esconde a visualização normal
+            leituraConfirmacaoDiv.style.display = 'none'; 
             
-            inputsCorrecaoManual.innerHTML = ''; // Limpa a área
+            // Esconde os botões normais e mostra a área de inputs
+            confirmationButtonsRow.style.display = 'none';
             correcaoManualArea.style.display = 'block';
+            
+            inputsCorrecaoManual.innerHTML = ''; 
+            correctionButtonsRow.style.display = 'flex'; // NOVO: Mostra o botão Salvar/Confirmar
 
             const alternativasPermitidas = ['A', 'B', 'C', 'D', 'E'].slice(0, NUM_ALTERNATIVAS);
             
-            // Injeta inputs com as respostas lidas pela IA já selecionadas
             Object.entries(respostasTemporarias).forEach(([questao, resposta]) => {
                 const div = document.createElement('div');
                 div.innerHTML = `
@@ -498,20 +520,19 @@
                 inputsCorrecaoManual.appendChild(div);
             });
             
-            // Volta a exibir a div de confirmação para que o botão "Confirmar Leitura" funcione
+            // Volta a exibir a div de confirmação que contém a área de edição e o botão Salvar
             leituraConfirmacaoDiv.style.display = 'block';
             
-            resultadoDiv.innerHTML = `✍️ **EDITANDO MANUALMENTE** as respostas de **${alunoEmProcessamento}**. Altere o que for necessário e clique em **Confirmar Leitura Correta**.`;
+            resultadoDiv.innerHTML = `✍️ **EDITANDO MANUALMENTE** as respostas de **${alunoEmProcessamento}**. Altere o que for necessário e clique em **Salvar e Confirmar Alterações**.`;
             resultadoDiv.style.backgroundColor = '#fff3cd'; 
             resultadoDiv.style.borderColor = '#ffc107'; 
         }
 
-        // MUDANÇA: Função Confirmar Leitura agora verifica e usa a correção manual
-        function confirmarLeitura() {
+        function confirmarLeitura(isManualCorrection) {
             let respostasFinais = {};
 
-            // 1. CHECA SE A CORREÇÃO MANUAL ESTÁ ATIVA
-            if (correcaoManualArea.style.display === 'block') {
+            // 1. CHECA SE PRECISAMOS LER OS INPUTS MANUAIS
+            if (isManualCorrection) {
                 const selects = inputsCorrecaoManual.querySelectorAll('select');
                 let preenchimentoValido = true;
                 
@@ -529,7 +550,7 @@
                 }
 
             } else {
-                // 2. SE NÃO ESTIVER ATIVA, USA O RESULTADO AUTOMÁTICO DA IA
+                // 2. SE NÃO FOR CORREÇÃO MANUAL, USA O RESULTADO AUTOMÁTICO
                 respostasFinais = respostasTemporarias;
             }
 
@@ -547,10 +568,10 @@
             alunoInput.value = '';
             resetStudentInput();
             
-            // NOVO: Esconde a área de correção manual ao resetar
+            // Esconde a área de correção manual ao resetar
             correcaoManualArea.style.display = 'none'; 
             inputsCorrecaoManual.innerHTML = '';
-
+            correctionButtonsRow.style.display = 'none';
 
             encerrarBtn.disabled = false;
             alunosCountSpan.textContent = dadosGabaritos.length;
@@ -564,9 +585,11 @@
         function reenviarImagem() {
             resetStudentInput(true); // Manter nome do aluno
             
-            // NOVO: Esconde a área de correção manual ao resetar
+            // Esconde a área de correção manual ao resetar
             correcaoManualArea.style.display = 'none'; 
             inputsCorrecaoManual.innerHTML = '';
+            correctionButtonsRow.style.display = 'none';
+            confirmationButtonsRow.style.display = 'flex';
             
             resultadoDiv.textContent = `Reenvie a imagem do gabarito para ${alunoEmProcessamento}.`;
             resultadoDiv.style.backgroundColor = '#e9f5ff';
@@ -598,7 +621,6 @@
             
             gerarDownloadCSV(); 
             
-            // Resetar estado global
             dadosGabaritos = [];
             gabaritoOficialRespostas = [];
             NUM_QUESTOES = 0;
