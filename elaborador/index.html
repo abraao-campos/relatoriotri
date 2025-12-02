@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elaboração de Questões ENEM/BNCC (AI Vision)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            width: 100%;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        h1 { color: #333; text-align: center; }
+        h3 { border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 25px; }
+        input[type="text"], select {
+            margin: 8px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .form-field { margin-bottom: 15px; }
+        .required label::after { content: " *"; color: red; }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        #btn-gerar-questao { background-color: #007bff; color: white; width: 100%; }
+        #btn-gerar-questao:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        #resultado-ia {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #28a745;
+            background-color: #e6f7ef;
+            border-radius: 8px;
+            display: none;
+        }
+        .questao-elemento {
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        .alternativa {
+            margin-left: 20px;
+            margin-bottom: 5px;
+            font-weight: normal;
+        }
+        .gabarito-justificativa {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0ff;
+            border-left: 5px solid #007bff;
+            font-size: 0.9em;
+        }
+        
+        /* Botões de Controle e Seleção */
+        #controle-questoes {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+        }
+        .controle-buttons-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        #btn-mudar-parametros { background-color: #ffc107; color: #333; }
+        #btn-gerar-outra { background-color: #28a745; color: white; }
+        #btn-fechar-prova { background-color: #dc3545; color: white; }
+
+        /* Checkbox de Seleção */
+        .selecao-box {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .selecao-box input {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .questoes-contagem {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid #007bff;">
+        <a href="../index.html" style="margin-right: 20px; text-decoration: none; color: #333; font-weight: bold;">Leitor de Gabaritos</a>
+        <a href="./index.html" style="text-decoration: none; color: #007bff; font-weight: bold; padding: 5px 10px; border: 1px solid #007bff; border-radius: 5px;">Elaboração de Questões</a>
+    </div>
+    <div class="container">
+        <h1>Elaboração de Questões Preparatórias para o ENEM</h1>
+        <p style="text-align: center;">Total de questões selecionadas: <strong id="contagem-questoes">0</strong></p>
+        
+        <div id="form-parametros">
+            <h3>1. Definição dos Parâmetros Curriculares e de Conteúdo</h3>
+            <div class="form-grid">
+                <div class="form-field required">
+                    <label for="area-conhecimento">Área do Conhecimento:</label>
+                    <select id="area-conhecimento" required>
+                        <option value="">Selecione...</option>
+                        <option value="Linguagens, Códigos e suas Tecnologias">Linguagens, Códigos e suas Tecnologias</option>
+                        <option value="Ciências Humanas e suas Tecnologias">Ciências Humanas e suas Tecnologias</option>
+                        <option value="Ciências da Natureza e suas Tecnologias">Ciências da Natureza e suas Tecnologias</option>
+                        <option value="Matemática e suas Tecnologias">Matemática e suas Tecnologias</option>
+                    </select>
+                </div>
+                <div class="form-field required">
+                    <label for="componente-curricular">Componente Curricular (Matéria):</label>
+                    <input type="text" id="componente-curricular" placeholder="Ex: Biologia, História, Português, Física" required>
+                </div>
+                <div class="form-field required">
+                    <label for="objeto-conhecimento">Objeto do Conhecimento (Conteúdo Específico):</label>
+                    <input type="text" id="objeto-conhecimento" placeholder="Ex: Cálculo Estequiométrico, Guerra Fria, Crase" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="competencia">Competência (Matriz ENEM):</label>
+                    <input type="text" id="competencia" placeholder="Ex: Competência de Área 1 (Opcional)">
+                </div>
+                <div class="form-field">
+                    <label for="habilidade">Habilidade (Matriz ENEM):</label>
+                    <input type="text" id="habilidade" placeholder="Ex: H1 (Opcional)">
+                </div>
+                
+                <div class="form-field">
+                    <label for="etapa-ensino">Etapa de Ensino:</label>
+                    <select id="etapa-ensino">
+                        <option value="">Opcional</option>
+                        <option value="1º Ano do Ensino Médio">1º Ano EM</option>
+                        <option value="2º Ano do Ensino Médio">2º Ano EM</option>
+                        <option value="3º Ano do Ensino Médio">3º Ano EM</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="dificuldade">Dificuldade do Item (TRI):</label>
+                    <select id="dificuldade">
+                        <option value="">Opcional</option>
+                        <option value="Fácil">Fácil</option>
+                        <option value="Média">Média</option>
+                        <option value="Difícil">Difícil</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="tematica">Temática e Contexto:</label>
+                    <input type="text" id="tematica" placeholder="Ex: Sustentabilidade, Inovação Tecnológica (Opcional)">
+                </div>
+            </div>
+            
+            <button id="btn-gerar-questao" disabled>🧠 Gerar Primeira Questão com IA</button>
+            <p id="feedback" style="margin-top: 15px; color: #dc3545; display: none;">Preencha os campos obrigatórios.</p>
+        </div>
+
+        <div id="resultado-ia" style="display: none;">
+            <h3>2. Questão Gerada pela IA</h3>
+            <div class="selecao-box">
+                <input type="checkbox" id="selecionar-questao">
+                <label for="selecionar-questao">Marcar para Uso na Prova</label>
+            </div>
+
+            <div id="questoes-area">
+                </div>
+
+            <div id="justificativa-area" class="gabarito-justificativa">
+                </div>
+            
+            <div class="questoes-contagem">
+                <span id="contagem-atualizacao">Questão 1 de N.</span>
+            </div>
+
+            <div id="controle-questoes">
+                <h4>Opções de Controle</h4>
+                <div class="controle-buttons-group">
+                    <button id="btn-gerar-outra">🔄 Gerar Outra Questão (Mesmos Parâmetros)</button>
+                    <button id="btn-mudar-parametros">📝 Mudar Parâmetros</button>
+                    <button id="btn-fechar-prova" disabled>📄 Fechar Prova (Gerar Arquivo)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- VARIÁVEIS DE ESTADO ---
+        let questoesSelecionadas = [];
+        let questaoAtual = null; 
+        let contagemGeracao = 0; 
+
+        // --- REFERÊNCIAS DE UI ---
+        const formParametros = document.getElementById('form-parametros');
+        const resultadoIa = document.getElementById('resultado-ia');
+        const btnGerar = document.getElementById('btn-gerar-questao');
+        const feedbackDiv = document.getElementById('feedback');
+        const questoesArea = document.getElementById('questoes-area');
+        const justificativaArea = document.getElementById('justificativa-area');
+        const selecionarQuestao = document.getElementById('selecionar-questao');
+        const contagemQuestoesSpan = document.getElementById('contagem-questoes');
+        const contagemAtualizacaoSpan = document.getElementById('contagem-atualizacao');
+        const controleQuestoesDiv = document.getElementById('controle-questoes');
+        const btnGerarOutra = document.getElementById('btn-gerar-outra');
+        const btnMudarParametros = document.getElementById('btn-mudar-parametros');
+        const btnFecharProva = document.getElementById('btn-fechar-prova');
+
+        // --- FUNÇÕES DE CONTROLE ---
+
+        function validarFormulario() {
+            const camposObrigatorios = ['area-conhecimento', 'componente-curricular', 'objeto-conhecimento'];
+            let valido = true;
+            camposObrigatorios.forEach(id => {
+                const input = document.getElementById(id);
+                if (!input.value.trim()) {
+                    valido = false;
+                }
+            });
+
+            if (valido) {
+                btnGerar.disabled = false;
+                feedbackDiv.style.display = 'none';
+            } else {
+                btnGerar.disabled = true;
+                feedbackDiv.textContent = "Preencha todos os campos obrigatórios (*).";
+                feedbackDiv.style.display = 'block';
+            }
+            return valido;
+        }
+
+        function coletarParametros() {
+            return {
+                Area_do_Conhecimento: document.getElementById('area-conhecimento').value.trim(),
+                Componente_Curricular: document.getElementById('componente-curricular').value.trim(),
+                Objeto_do_Conhecimento: document.getElementById('objeto-conhecimento').value.trim(),
+                Competencia: document.getElementById('competencia').value.trim(),
+                Habilidade: document.getElementById('habilidade').value.trim(),
+                Etapa_de_Ensino: document.getElementById('etapa-ensino').value.trim(),
+                Dificuldade_do_Item: document.getElementById('dificuldade').value.trim(),
+                Tematica_e_Contexto: document.getElementById('tematica').value.trim(),
+            };
+        }
+
+        async function gerarQuestao(parametros, isRetry = false) {
+            if (!validarFormulario() && !isRetry) return; // Só valida obrigatórios na primeira tentativa
+            
+            btnGerar.disabled = true;
+            btnGerarOutra.disabled = true;
+            btnFecharProva.disabled = true;
+            
+            resultadoIa.style.display = 'none';
+            feedbackDiv.style.display = 'block';
+            feedbackDiv.style.backgroundColor = '#e9f5ff';
+            feedbackDiv.style.color = '#007bff';
+            feedbackDiv.textContent = `🧠 Gerando item preparatório para o ENEM... (Isso pode levar alguns segundos, a IA está realizando pesquisa na web.)`;
+            
+            // Trava o formulário durante o processamento
+            Array.from(formParametros.querySelectorAll('input, select')).forEach(input => input.disabled = true);
+
+
+            try {
+                // CHAMA O NOVO ENDPOINT DE BACKEND
+                const response = await fetch('/api/generate_question', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parametros })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || "Erro desconhecido ao chamar a API de IA.");
+                }
+
+                contagemGeracao++;
+                questaoAtual = data.questao; 
+                
+                exibirQuestao(questaoAtual);
+
+                feedbackDiv.style.display = 'none';
+                
+            } catch (error) {
+                console.error("Erro na geração da questão:", error);
+                feedbackDiv.textContent = `❌ Erro na geração: ${error.message}. Tente novamente ou mude os parâmetros.`;
+                feedbackDiv.style.backgroundColor = '#f8d7da';
+                feedbackDiv.style.color = '#721c24';
+                
+                // Em caso de erro, reabilita o botão para que o usuário tente novamente
+                Array.from(formParametros.querySelectorAll('input, select')).forEach(input => input.disabled = false);
+                btnGerar.disabled = false;
+                
+            } finally {
+                btnGerarOutra.disabled = false;
+                btnFecharProva.disabled = questoesSelecionadas.length === 0;
+            }
+        }
+
+        function exibirQuestao(questao) {
+            // Reinicia a visualização
+            questoesArea.innerHTML = '';
+            justificativaArea.innerHTML = '';
+            
+            // Garante que o checkbox reflita o estado atual (útil ao gerar "outra")
+            const isSelecionada = questoesSelecionadas.some(q => q.original_hash === getQuestaoHash(questao));
+            selecionarQuestao.checked = isSelecionada;
+
+
+            // Estrutura da Questão
+            let htmlQuestao = '';
+            
+            // 1. Suporte e Enunciado/Comando
+            htmlQuestao += `<div class="questao-elemento"><strong>Suporte:</strong> ${formatText(questao.Suporte)}</div>`;
+            htmlQuestao += `<div class="questao-elemento"><strong>Enunciado:</strong> ${formatText(questao.Enunciado)}</div>`;
+            htmlQuestao += `<div class="questao-elemento"><strong>Comando:</strong> ${formatText(questao.Comando)}</div>`;
+            
+            // 2. Alternativas
+            htmlQuestao += `<div class="questao-elemento"><strong>Alternativas:</strong><ol style="list-style-type: upper-alpha; padding-left: 25px;">`;
+            // Garante que o texto seja retirado do objeto de alternativas, caso exista
+            ['A', 'B', 'C', 'D', 'E'].forEach(letra => {
+                const alternativaText = questao.Alternativas && questao.Alternativas[letra] ? questao.Alternativas[letra] : `[Alternativa ${letra} não gerada]`;
+                htmlQuestao += `<li class="alternativa">(${letra}) ${formatText(alternativaText)}</li>`;
+            });
+            htmlQuestao += `</ol></div>`;
+
+            questoesArea.innerHTML = htmlQuestao;
+
+            // 3. Gabarito e Justificativa
+            justificativaArea.innerHTML = `
+                <p style="font-weight: bold; color: #dc3545;">Gabarito: ${questao.Gabarito || 'N/A'}</p>
+                <p style="font-weight: bold;">Justificativa Comentada:</p>
+                <p>${formatText(questao.Justificativa_Comentada || 'Justificativa não fornecida.')}</p>
+                <p><strong>Competência/Habilidade:</strong> ${questao.Competencia_Habilidade || 'Não especificada'}</p>
+            `;
+
+            // Exibe a área de resultado
+            resultadoIa.style.display = 'block';
+            controleQuestoesDiv.style.display = 'block';
+            contagemAtualizacaoSpan.textContent = `Questão atual (Tentativa #${contagemGeracao})`;
+        }
+
+        // Helper para garantir quebra de linha seja exibida corretamente
+        function formatText(text) {
+            if (typeof text !== 'string') return '';
+            return text.replace(/\n/g, '<br>');
+        }
+        
+        // Helper para criar um hash único e identificar a questão, evitando duplicidade
+        function getQuestaoHash(questao) {
+            // Usa os campos principais para o hash
+            return JSON.stringify({
+                s: questao.Suporte,
+                e: questao.Enunciado,
+                c: questao.Comando
+            });
+        }
+
+        // --- EVENT LISTENERS E LÓGICA DE CONTROLE ---
+
+        // Validação em tempo real do formulário
+        Array.from(formParametros.querySelectorAll('input, select')).forEach(input => {
+            input.addEventListener('input', validarFormulario);
+        });
+
+        // Clique para Gerar a Primeira Questão
+        btnGerar.addEventListener('click', () => {
+            if (validarFormulario()) {
+                gerarQuestao(coletarParametros());
+            }
+        });
+
+        // Botão: Gerar Outra Questão (Mesmos Parâmetros)
+        btnGerarOutra.addEventListener('click', () => {
+            gerarQuestao(coletarParametros(), true);
+        });
+
+        // Botão: Mudar Parâmetros
+        btnMudarParametros.addEventListener('click', () => {
+            // Desbloqueia e esconde o resultado
+            Array.from(formParametros.querySelectorAll('input, select')).forEach(input => input.disabled = false);
+            resultadoIa.style.display = 'none';
+            controleQuestoesDiv.style.display = 'none';
+            feedbackDiv.style.display = 'none';
+            btnGerar.disabled = false; 
+            validarFormulario(); 
+        });
+
+        // Checkbox de Seleção
+        selecionarQuestao.addEventListener('change', () => {
+            if (!questaoAtual) return;
+
+            const hash = getQuestaoHash(questaoAtual);
+            
+            // Adiciona um hash único para identificar a questão no banco
+            const questaoComHash = {
+                ...questaoAtual,
+                original_hash: hash 
+            };
+
+            const indexExistente = questoesSelecionadas.findIndex(q => q.original_hash === hash);
+
+            if (selecionarQuestao.checked) {
+                if (indexExistente === -1) {
+                    questoesSelecionadas.push(questaoComHash);
+                }
+            } else {
+                if (indexExistente !== -1) {
+                    questoesSelecionadas.splice(indexExistente, 1);
+                }
+            }
+
+            // Atualiza a contagem e reabilita/desabilita o botão de fechar prova
+            contagemQuestoesSpan.textContent = questoesSelecionadas.length;
+            btnFecharProva.disabled = questoesSelecionadas.length === 0;
+        });
+
+
+        // Botão: Fechar Prova (Gerar Arquivo)
+        btnFecharProva.addEventListener('click', gerarArquivoProva);
+        
+        function gerarArquivoProva() {
+            if (questoesSelecionadas.length === 0) {
+                alert("Nenhuma questão foi selecionada para montar a prova.");
+                return;
+            }
+
+            const nomeMateria = document.getElementById('componente-curricular').value.trim() || 'Prova';
+            const nomeProva = `${nomeMateria} - Prova (Gerada pela IA - ${new Date().toLocaleDateString()})`;
+            
+            // A ordem das questões é a ordem em que foram selecionadas
+            const provaFinal = questoesSelecionadas; 
+
+            // --- GERAÇÃO DO CONTEÚDO HTML/DOCX ---
+            let htmlContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 800px; margin: auto;">
+                    <h1 style="text-align: center; color: #333;">${nomeProva}</h1>
+                    <p style="text-align: center; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+                        <strong>Área:</strong> ${document.getElementById('area-conhecimento').value} | 
+                        <strong>Componente Curricular:</strong> ${nomeMateria}
+                    </p>
+            `;
+
+            let htmlGabarito = `
+                <h2 style="page-break-before: always; color: #007bff; text-align: center;">Gabarito da Prova</h2>
+                <table border="1" style="width: 50%; margin: 20px auto; border-collapse: collapse;">
+                    <thead><tr><th style="padding: 10px;">Item</th><th style="padding: 10px;">Gabarito</th></tr></thead>
+                    <tbody>
+            `;
+
+            // 1. Inserir Questões (Visualização do Aluno)
+            provaFinal.forEach((q, index) => {
+                const num = index + 1;
+                
+                // Questão
+                htmlContent += `
+                    <div style="margin-top: 30px; page-break-inside: avoid;">
+                        <h3 style="color: #333; margin-top: 0;">Questão ${num}</h3>
+                        ${q.Suporte ? `<p><strong>Suporte:</strong> ${formatText(q.Suporte)}</p>` : ''}
+                        <p><strong>Enunciado:</strong> ${formatText(q.Enunciado)}</p>
+                        <p><strong>Comando:</strong> ${formatText(q.Comando)}</p>
+                        <ol style="list-style-type: upper-alpha; padding-left: 20px;">
+                            <li style="margin-bottom: 5px;">${formatText(q.Alternativas.A)}</li>
+                            <li style="margin-bottom: 5px;">${formatText(q.Alternativas.B)}</li>
+                            <li style="margin-bottom: 5px;">${formatText(q.Alternativas.C)}</li>
+                            <li style="margin-bottom: 5px;">${formatText(q.Alternativas.D)}</li>
+                            <li style="margin-bottom: 5px;">${formatText(q.Alternativas.E)}</li>
+                        </ol>
+                    </div>
+                `;
+                
+                // Gabarito
+                htmlGabarito += `
+                    <tr>
+                        <td style="padding: 8px; text-align: center;">${num}</td>
+                        <td style="padding: 8px; text-align: center;">${q.Gabarito}</td>
+                    </tr>
+                `;
+            });
+
+            htmlGabarito += `</tbody></table>`;
+            htmlContent += htmlGabarito;
+            
+            // 2. Inserir Justificativas (Uso do Professor)
+            htmlContent += `
+                <h2 style="page-break-before: always; color: #28a745; text-align: center;">Justificativas Comentadas (Uso Interno - Professor)</h2>
+            `;
+            provaFinal.forEach((q, index) => {
+                const num = index + 1;
+                htmlContent += `
+                    <div style="margin-top: 25px; border: 1px solid #ccc; padding: 15px; border-radius: 5px; page-break-inside: avoid;">
+                        <h4 style="color: #28a745;">Questão ${num} - Gabarito: ${q.Gabarito}</h4>
+                        <p><strong>Competência/Habilidade:</strong> ${q.Competencia_Habilidade}</p>
+                        <p><strong>Objeto do Conhecimento:</strong> ${document.getElementById('objeto-conhecimento').value}</p>
+                        <p><strong>Justificativa Detalhada:</strong> ${formatText(q.Justificativa_Comentada)}</p>
+                    </div>
+                `;
+            });
+
+            htmlContent += `</div>`;
+            
+            // --- DOWNLOAD ---
+            const link = document.createElement('a');
+            const file = new Blob([htmlContent], { type: 'application/msword;charset=utf-8' }); 
+            
+            link.href = URL.createObjectURL(file);
+            link.download = `${nomeProva.replace(/[^a-zA-Z0-9\s-]/g, '')}.doc`; 
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Limpa o estado após o download
+            questoesSelecionadas = [];
+            contagemQuestoesSpan.textContent = '0';
+            btnFecharProva.disabled = true;
+            alert(`🎉 Prova "${nomeProva}" gerada com sucesso! O sistema foi limpo para a próxima prova.`);
+            
+            // Resetar a UI para que o usuário possa começar uma nova prova imediatamente
+            btnMudarParametros.click(); 
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', validarFormulario);
+    </script>
+</body>
+</html>
