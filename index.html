@@ -39,6 +39,7 @@
             transition: background-color 0.3s, transform 0.2s;
             font-size: 1.2em;
         }
+        /* Links Principais */
         .leitor-gabarito {
             background-color: #007bff;
         }
@@ -51,6 +52,15 @@
         }
         .elaborador-questao:hover {
             background-color: #1e7e34;
+            transform: translateY(-2px);
+        }
+        /* Link Secundário (Análise) */
+        .analise-resultados {
+            background-color: #ffc107; /* Amarelo/Laranja para destaque de análise */
+            color: #333;
+        }
+        .analise-resultados:hover {
+            background-color: #e0a800;
             transform: translateY(-2px);
         }
     </style>
@@ -67,9 +77,13 @@
         <a href="./elaborador/index.html" class="menu-link elaborador-questao">
             📝 Elaboração de Questões (Geração ENEM/BNCC)
         </a>
+        
+        <a href="./analise/" class="menu-link analise-resultados">
+            📊 Análise de Resultados
+        </a>
 
         <p style="margin-top: 30px; font-size: 0.8em; color: #6c757d;">
-            Para voltar à página de análise de resultados, clique <a href="https://relatoriotri.vercel.app/" target="_blank">aqui</a>.
+            Para voltar à página de análise de resultados (Link Externo), clique <a href="https://relatoriotri.vercel.app/" target="_blank">aqui</a>.
         </p>
     </div>
 </body>
