@@ -1,8 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -10,7 +10,7 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXX'); 
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Avaliação Inteligente (Menu Principal)</title>
     <style>
         body {
@@ -39,7 +39,7 @@
         .menu-link {
             display: block;
             margin: 15px 0;
-            padding: 15px;
+            padding: 20px; /* Aumentei o padding para o "quadro" ficar maior */
             text-decoration: none;
             color: white;
             font-weight: bold;
@@ -49,14 +49,14 @@
         }
         /* Links Principais */
         .leitor-gabarito {
-            background-color: #007bff;
+            background-color: #007bff; /* Azul */
         }
         .leitor-gabarito:hover {
             background-color: #0056b3;
             transform: translateY(-2px);
         }
         .elaborador-questao {
-            background-color: #28a745;
+            background-color: #28a745; /* Verde */
         }
         .elaborador-questao:hover {
             background-color: #1e7e34;
@@ -64,7 +64,7 @@
         }
         /* Link Secundário (Análise) */
         .analise-resultados {
-            background-color: #ffc107; /* Amarelo/Laranja para destaque de análise */
+            background-color: #ffc107; /* Amarelo/Laranja */
             color: #333;
         }
         .analise-resultados:hover {
@@ -78,21 +78,17 @@
         <h1>Sistema de Avaliação Inteligente 🤖</h1>
         <p>Selecione a funcionalidade que deseja utilizar:</p>
         
-        <a href="./leitor/index.html" class="menu-link leitor-gabarito">
-            📸 Leitor de Gabaritos
-        </a>
-        
-        <a href="./elaborador/index.html" class="menu-link elaborador-questao">
+                <a href="./elaborador/index.html" class="menu-link elaborador-questao">
             📝 Elaboração de Questões
         </a>
         
-        <a href="./analise/" class="menu-link analise-resultados">
+                <a href="./leitor/index.html" class="menu-link leitor-gabarito">
+            📸 Leitor de Gabaritos
+        </a>
+        
+                <a href="./analise/" class="menu-link analise-resultados">
             📊 Análise de Resultados
         </a>
-
-        <p style="margin-top: 30px; font-size: 0.8em; color: #6c757d;">
-            Para voltar à página de análise de resultados (Link Externo), clique <a href="https://relatoriotri.vercel.app/" target="_blank">aqui</a>.
-        </p>
     </div>
 </body>
 </html>
