@@ -1,7 +1,6 @@
 // api/generate_question.js
 const { GoogleGenAI } = require('@google/genai');
 
-// Força a utilização da variável de ambiente CHAVE
 // A CHAVE DEVE SER CONFIGURADA NO SEU AMBIENTE (ex: Vercel Secrets, .env)
 const ai = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY 
@@ -44,7 +43,6 @@ module.exports = async (req, res) => {
         }
         
         // --- 1. CONSTRUÇÃO DO PROMPT DE 9 ETAPAS ---
-        // Este prompt segue rigorosamente as suas 9 etapas
         const promptCompleto = `
             Você é um Elaborador de Itens de Alta Proficiência, especializado na construção de questões preparatórias para o ENEM (Exame Nacional do Ensino Médio). Seu objetivo é gerar uma questão completa, altamente alinhada aos padrões da Matriz de Referência do ENEM e às diretrizes curriculares, utilizando a pesquisa na internet para embasamento de conteúdo e suporte.
 
@@ -108,7 +106,8 @@ module.exports = async (req, res) => {
         
         // --- 2. CHAMADA À API GEMINI COM PESQUISA NA WEB ---
         const result = await ai.models.generateContent({
-            model: 'gemini-1.5-flash', // Recomendado por ser rápido e ter boa capacidade de raciocínio e pesquisa
+            // CORREÇÃO CRÍTICA: Trocando 'gemini-1.5-flash' por 'gemini-2.5-flash'
+            model: 'gemini-2.5-flash', 
             contents: promptCompleto,
             config: {
                 tools: [{ googleSearch: {} }], // Ativa a busca na web (Etapa 7)
