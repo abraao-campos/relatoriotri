@@ -5,132 +5,218 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elaboração de Questões ENEM/BNCC (AI Vision)</title>
     <style>
+        :root {
+            --primary-color: #007bff; /* Azul primário */
+            --secondary-color: #28a745; /* Verde para geração */
+            --warning-color: #ffc107; /* Amarelo para mudar */
+            --danger-color: #dc3545; /* Vermelho para fechar */
+            --background-light: #f4f4f9;
+            --input-border: #ced4da;
+            --container-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-light);
+            padding: 30px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+
         .container {
             background-color: white;
             padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: var(--container-shadow);
             max-width: 900px;
             width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             text-align: left;
         }
-        h1 { color: #333; text-align: center; }
-        h3 { border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 25px; }
+
+        h1 { 
+            color: var(--primary-color); 
+            text-align: center; 
+            margin-bottom: 5px;
+        }
+
+        h3 { 
+            border-bottom: 2px solid #e9ecef; 
+            padding-bottom: 10px; 
+            margin-top: 30px; 
+            margin-bottom: 20px;
+            color: #495057;
+        }
+
+        /* --- INPUTS E SELECTS --- */
         input[type="text"], select {
-            margin: 8px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            margin: 0;
+            padding: 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
             width: 100%;
             box-sizing: border-box;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
-        }
-        .form-field { margin-bottom: 15px; }
-        .required label::after { content: " *"; color: red; }
-        
-        button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            background-color: #ffffff;
             font-size: 1em;
-            transition: background-color 0.3s;
-            margin-top: 10px;
         }
-        #btn-gerar-questao { background-color: #007bff; color: white; width: 100%; }
-        #btn-gerar-questao:disabled { background-color: #ccc; cursor: not-allowed; }
+        input[type="text"]:focus, select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+            outline: none;
+        }
 
+        /* Removendo o grid e usando layout vertical simples */
+        .form-grid {
+            display: block; /* Volta para o comportamento de bloco */
+            gap: 0;
+        }
+
+        .form-field { 
+            margin-bottom: 15px; /* Adiciona espaçamento vertical entre os campos */
+        }
+        
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .required label::after { 
+            content: " *"; 
+            color: var(--danger-color); 
+        }
+        
+        /* --- BOTÕES --- */
+        button {
+            padding: 14px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-top: 20px;
+            letter-spacing: 0.5px;
+        }
+        #btn-gerar-questao { 
+            background-color: var(--primary-color); 
+            color: white; 
+            width: 100%; 
+        }
+        #btn-gerar-questao:hover:not(:disabled) { 
+            background-color: #0056b3; 
+            transform: translateY(-1px);
+        }
+        #btn-gerar-questao:disabled { 
+            background-color: #adb5bd; 
+            cursor: not-allowed; 
+        }
+
+        /* --- FEEDBACK IA --- */
         #resultado-ia {
             margin-top: 30px;
-            padding: 20px;
-            border: 1px solid #28a745;
+            padding: 25px;
+            border: 1px solid var(--secondary-color);
             background-color: #e6f7ef;
-            border-radius: 8px;
+            border-radius: 10px;
             display: none;
         }
+
+        /* Melhoria na visualização da questão */
         .questao-elemento {
             margin-bottom: 15px;
-            line-height: 1.5;
+            padding: 5px 0;
+            border-left: 3px solid #6c757d;
+            padding-left: 10px;
+            line-height: 1.6;
+        }
+        .questao-elemento strong {
+            color: #343a40;
+            display: block;
         }
         .alternativa {
             margin-left: 20px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: normal;
         }
-        .gabarito-justificativa {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f0f0ff;
-            border-left: 5px solid #007bff;
-            font-size: 0.9em;
+        .alternativa li {
+            list-style-position: inside;
         }
         
-        /* Botões de Controle e Seleção */
-        #controle-questoes {
-            margin-top: 20px;
+        .gabarito-justificativa {
+            margin-top: 30px;
             padding: 15px;
-            border: 1px solid #ccc;
+            background-color: #f0f4ff;
+            border: 1px solid var(--primary-color);
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+        .gabarito-justificativa p { margin-top: 5px; margin-bottom: 5px; }
+
+        /* --- CONTROLES E BOTÕES SECUNDÁRIOS --- */
+        #controle-questoes {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid var(--input-border);
             border-radius: 8px;
             display: none;
             text-align: center;
+            background-color: #ffffff;
         }
         .controle-buttons-group {
             display: flex;
             justify-content: center;
+            flex-wrap: wrap;
             gap: 15px;
             margin-top: 15px;
         }
-        #btn-mudar-parametros { background-color: #ffc107; color: #333; }
-        #btn-gerar-outra { background-color: #28a745; color: white; }
-        #btn-fechar-prova { background-color: #dc3545; color: white; }
+        #btn-mudar-parametros { background-color: var(--warning-color); color: #333; }
+        #btn-mudar-parametros:hover { background-color: #e0a800; transform: translateY(-1px); }
+        
+        #btn-gerar-outra { background-color: var(--secondary-color); color: white; }
+        #btn-gerar-outra:hover { background-color: #1e7e34; transform: translateY(-1px); }
 
-        /* Checkbox de Seleção */
-        .selecao-box {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-            cursor: pointer;
+        #btn-fechar-prova { background-color: var(--danger-color); color: white; }
+        #btn-fechar-prova:hover:not(:disabled) { background-color: #c82333; transform: translateY(-1px); }
+
+        .selecao-box label {
             font-size: 1.1em;
-            font-weight: bold;
-        }
-        .selecao-box input {
-            width: 20px;
-            height: 20px;
-            margin-right: 10px;
             cursor: pointer;
+            color: var(--secondary-color);
         }
-        .questoes-contagem {
+
+        /* --- RODAPÉ --- */
+        .rodape {
+            margin-top: 30px;
             font-size: 0.9em;
             color: #6c757d;
-            margin-top: 10px;
+            text-align: center;
+        }
+        .rodape a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .rodape a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <div style="text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid #007bff;">
-        <a href="../index.html" style="margin-right: 20px; text-decoration: none; color: #333; font-weight: bold;">Leitor de Gabaritos</a>
-        <a href="./index.html" style="text-decoration: none; color: #007bff; font-weight: bold; padding: 5px 10px; border: 1px solid #007bff; border-radius: 5px;">Elaboração de Questões</a>
-    </div>
     <div class="container">
-        <h1>Elaboração de Questões Preparatórias para o ENEM</h1>
-        <p style="text-align: center;">Total de questões selecionadas: <strong id="contagem-questoes">0</strong></p>
+        <h1>Elaboração de Questões Preparatórias para o ENEM 🤖</h1>
+        <p style="text-align: center; font-size: 1.1em; color: #343a40;">
+            Total de questões selecionadas: <strong id="contagem-questoes" style="color: var(--primary-color);">0</strong>
+        </p>
         
         <div id="form-parametros">
             <h3>1. Definição dos Parâmetros Curriculares e de Conteúdo</h3>
             <div class="form-grid">
+                
+                <h4 style="margin-bottom: 10px; color: #007bff;">Parâmetros Obrigatórios</h4>
                 <div class="form-field required">
                     <label for="area-conhecimento">Área do Conhecimento:</label>
                     <select id="area-conhecimento" required>
@@ -149,7 +235,8 @@
                     <label for="objeto-conhecimento">Objeto do Conhecimento (Conteúdo Específico):</label>
                     <input type="text" id="objeto-conhecimento" placeholder="Ex: Cálculo Estequiométrico, Guerra Fria, Crase" required>
                 </div>
-                
+
+                <h4 style="margin-top: 25px; margin-bottom: 10px; color: #28a745;">Parâmetros Opcionais</h4>
                 <div class="form-field">
                     <label for="competencia">Competência (Matriz ENEM):</label>
                     <input type="text" id="competencia" placeholder="Ex: Competência de Área 1 (Opcional)">
@@ -158,7 +245,10 @@
                     <label for="habilidade">Habilidade (Matriz ENEM):</label>
                     <input type="text" id="habilidade" placeholder="Ex: H1 (Opcional)">
                 </div>
-                
+                <div class="form-field">
+                    <label for="tematica">Temática e Contexto:</label>
+                    <input type="text" id="tematica" placeholder="Ex: Sustentabilidade, Inovação Tecnológica (Opcional)">
+                </div>
                 <div class="form-field">
                     <label for="etapa-ensino">Etapa de Ensino:</label>
                     <select id="etapa-ensino">
@@ -177,21 +267,18 @@
                         <option value="Difícil">Difícil</option>
                     </select>
                 </div>
-                <div class="form-field">
-                    <label for="tematica">Temática e Contexto:</label>
-                    <input type="text" id="tematica" placeholder="Ex: Sustentabilidade, Inovação Tecnológica (Opcional)">
-                </div>
+                
             </div>
             
             <button id="btn-gerar-questao" disabled>🧠 Gerar Primeira Questão com IA</button>
-            <p id="feedback" style="margin-top: 15px; color: #dc3545; display: none;">Preencha os campos obrigatórios.</p>
+            <p id="feedback" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;">Preencha os campos obrigatórios.</p>
         </div>
 
         <div id="resultado-ia" style="display: none;">
             <h3>2. Questão Gerada pela IA</h3>
             <div class="selecao-box">
                 <input type="checkbox" id="selecionar-questao">
-                <label for="selecionar-questao">Marcar para Uso na Prova</label>
+                <label for="selecionar-questao">☑️ Marcar para Uso na Prova</label>
             </div>
 
             <div id="questoes-area">
@@ -201,7 +288,7 @@
                 </div>
             
             <div class="questoes-contagem">
-                <span id="contagem-atualizacao">Questão 1 de N.</span>
+                <span id="contagem-atualizacao">Questão atual (Tentativa #1)</span>
             </div>
 
             <div id="controle-questoes">
@@ -215,7 +302,14 @@
         </div>
     </div>
     
+    <div class="rodape">
+        <a href="https://relatoriotri.vercel.app/" target="_self">
+            ⬅️ Voltar para a Página Principal
+        </a>
+    </div>
+
     <script>
+        // *** O CÓDIGO JAVASCRIPT PERMANECE EXATAMENTE O MESMO ***
         // --- VARIÁVEIS DE ESTADO ---
         let questoesSelecionadas = [];
         let questaoAtual = null; 
@@ -255,6 +349,9 @@
                 btnGerar.disabled = true;
                 feedbackDiv.textContent = "Preencha todos os campos obrigatórios (*).";
                 feedbackDiv.style.display = 'block';
+                feedbackDiv.style.color = '#721c24';
+                feedbackDiv.style.backgroundColor = '#f8d7da';
+                feedbackDiv.style.border = '1px solid #f5c6cb';
             }
             return valido;
         }
@@ -273,7 +370,7 @@
         }
 
         async function gerarQuestao(parametros, isRetry = false) {
-            if (!validarFormulario() && !isRetry) return; // Só valida obrigatórios na primeira tentativa
+            if (!validarFormulario() && !isRetry) return;
             
             btnGerar.disabled = true;
             btnGerarOutra.disabled = true;
@@ -283,6 +380,7 @@
             feedbackDiv.style.display = 'block';
             feedbackDiv.style.backgroundColor = '#e9f5ff';
             feedbackDiv.style.color = '#007bff';
+            feedbackDiv.style.border = '1px solid #b8daff';
             feedbackDiv.textContent = `🧠 Gerando item preparatório para o ENEM... (Isso pode levar alguns segundos, a IA está realizando pesquisa na web.)`;
             
             // Trava o formulário durante o processamento
@@ -315,6 +413,7 @@
                 feedbackDiv.textContent = `❌ Erro na geração: ${error.message}. Tente novamente ou mude os parâmetros.`;
                 feedbackDiv.style.backgroundColor = '#f8d7da';
                 feedbackDiv.style.color = '#721c24';
+                feedbackDiv.style.border = '1px solid #f5c6cb';
                 
                 // Em caso de erro, reabilita o botão para que o usuário tente novamente
                 Array.from(formParametros.querySelectorAll('input, select')).forEach(input => input.disabled = false);
@@ -357,7 +456,7 @@
 
             // 3. Gabarito e Justificativa
             justificativaArea.innerHTML = `
-                <p style="font-weight: bold; color: #dc3545;">Gabarito: ${questao.Gabarito || 'N/A'}</p>
+                <p style="font-weight: bold; color: var(--danger-color);">Gabarito: ${questao.Gabarito || 'N/A'}</p>
                 <p style="font-weight: bold;">Justificativa Comentada:</p>
                 <p>${formatText(questao.Justificativa_Comentada || 'Justificativa não fornecida.')}</p>
                 <p><strong>Competência/Habilidade:</strong> ${questao.Competencia_Habilidade || 'Não especificada'}</p>
