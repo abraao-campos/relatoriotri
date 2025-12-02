@@ -1,7 +1,8 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -9,63 +10,89 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXX'); 
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Análise Escolar</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f4f4f9;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            max-width: 400px; /* Limitei um pouco o tamanho para centralizar */
-            width: 90%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 30px;
-        }
-        .menu-link {
-            display: block;
-            margin: 15px 0;
-            padding: 15px 30px;
-            text-decoration: none;
-            color: white;
-            background-color: #007bff;
-            border-radius: 5px;
-            font-size: 1.2em;
-            transition: background-color 0.3s;
-        }
-        .menu-link.secondary {
-             background-color: #28a745; /* Cor diferente para o segundo link */
-        }
-        .menu-link:hover {
-            background-color: #0056b3;
-        }
-        .menu-link.secondary:hover {
-            background-color: #1e7e34;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Avaliação Inteligente (Menu Principal)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+        .menu-link {
+            display: block;
+            margin: 15px 0;
+            padding: 15px;
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.2s;
+            font-size: 1.2em;
+        }
+        /* Links Principais */
+        .leitor-gabarito {
+            background-color: #007bff;
+        }
+        .leitor-gabarito:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+        .elaborador-questao {
+            background-color: #28a745;
+        }
+        .elaborador-questao:hover {
+            background-color: #1e7e34;
+            transform: translateY(-2px);
+        }
+        /* Link Secundário (Análise) */
+        .analise-resultados {
+            background-color: #ffc107; /* Amarelo/Laranja para destaque de análise */
+            color: #333;
+        }
+        .analise-resultados:hover {
+            background-color: #e0a800;
+            transform: translateY(-2px);
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Selecione a Ferramenta</h1>
-        
-        <a href="./leitor/" class="menu-link">📸 Leitor de Gabaritos</a>
-        
-        <a href="./analise/" class="menu-link secondary">📊 Análise de Resultados</a>
-        
-        <p style="margin-top: 30px; color: #666;">Selecione a funcionalidade que deseja utilizar.</p>
-    </div>
+    <div class="container">
+        <h1>Sistema de Avaliação Inteligente 🤖</h1>
+        <p>Selecione a funcionalidade que deseja utilizar:</p>
+        
+        <a href="./leitor/index.html" class="menu-link leitor-gabarito">
+            📸 Leitor de Gabaritos
+        </a>
+        
+        <a href="./elaborador/index.html" class="menu-link elaborador-questao">
+            📝 Elaboração de Questões
+        </a>
+        
+        <a href="./analise/" class="menu-link analise-resultados">
+            📊 Análise de Resultados
+        </a>
+
+        <p style="margin-top: 30px; font-size: 0.8em; color: #6c757d;">
+            Para voltar à página de análise de resultados (Link Externo), clique <a href="https://relatoriotri.vercel.app/" target="_blank">aqui</a>.
+        </p>
+    </div>
 </body>
 </html>
