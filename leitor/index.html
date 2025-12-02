@@ -138,15 +138,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>📸 Leitor de Gabaritos (AI Vision)</h1>
+        <h1>📸 Leitor de Gabaritos</h1>
 
         <div id="config-section">
             <h3>1. Configuração da Prova</h3>
             <p>Informe a estrutura da prova.</p>
             <input type="number" id="num-questoes" placeholder="Número de Questões (Ex: 50)" min="1" required>
             <input type="number" id="num-alternativas" placeholder="Número de Alternativas (Ex: 5)" min="2" max="5" required>
-            <input type="number" id="num-pontos-referencia" value="4" disabled style="background-color: #f0f0f0;" title="O modelo de gabarito usa 4 pontos de referência fixos." required>
-            
+		<input type="number" id="num-pontos-referencia" value="4" disabled style="background-color: #f0f0f0; display: none;" title="O modelo de gabarito usa 4 pontos de referência fixos;" required>            
             <input type="text" id="turma-input" placeholder="Turma (Ex: 8A, 3º Ano B)" required>
 
             <button id="btn-definir-estrutura" disabled style="width: 100%; margin-top: 15px;">Definir Estrutura</button>
@@ -694,3 +693,4 @@
     </script>
 </body>
 </html>
+
