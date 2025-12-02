@@ -3,62 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Análise Escolar</title>
+    <title>Sistema de Avaliação Inteligente (Menu Principal)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #f4f4f9;
+            flex-direction: column;
         }
         .container {
             text-align: center;
-            padding: 40px;
             background-color: white;
+            padding: 40px;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            max-width: 400px; /* Limitei um pouco o tamanho para centralizar */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
             width: 90%;
         }
         h1 {
-            color: #333;
+            color: #007bff;
             margin-bottom: 30px;
         }
         .menu-link {
             display: block;
             margin: 15px 0;
-            padding: 15px 30px;
+            padding: 15px;
             text-decoration: none;
             color: white;
-            background-color: #007bff;
-            border-radius: 5px;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.2s;
             font-size: 1.2em;
-            transition: background-color 0.3s;
         }
-        .menu-link.secondary {
-             background-color: #28a745; /* Cor diferente para o segundo link */
+        .leitor-gabarito {
+            background-color: #007bff;
         }
-        .menu-link:hover {
+        .leitor-gabarito:hover {
             background-color: #0056b3;
+            transform: translateY(-2px);
         }
-        .menu-link.secondary:hover {
+        .elaborador-questao {
+            background-color: #28a745;
+        }
+        .elaborador-questao:hover {
             background-color: #1e7e34;
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Selecione a Ferramenta</h1>
+        <h1>Sistema de Avaliação Inteligente 🤖</h1>
+        <p>Selecione a funcionalidade que deseja utilizar:</p>
         
-        <a href="./leitor/" class="menu-link">📸 Leitor de Gabaritos</a>
+        <a href="./leitor/index.html" class="menu-link leitor-gabarito">
+            📸 Leitor de Gabaritos (Análise de Imagem)
+        </a>
         
-        <a href="./analise/" class="menu-link secondary">📊 Análise de Resultados</a>
-        
-        <p style="margin-top: 30px; color: #666;">Selecione a funcionalidade que deseja utilizar.</p>
+        <a href="./elaborador/index.html" class="menu-link elaborador-questao">
+            📝 Elaboração de Questões (Geração ENEM/BNCC)
+        </a>
+
+        <p style="margin-top: 30px; font-size: 0.8em; color: #6c757d;">
+            Para voltar à página de análise de resultados, clique <a href="https://relatoriotri.vercel.app/" target="_blank">aqui</a>.
+        </p>
     </div>
 </body>
 </html>
