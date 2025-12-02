@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8">
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXX"></script>
     <script>
@@ -10,85 +10,70 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXX'); 
     </script>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Avaliação Inteligente (Menu Principal)</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            flex-direction: column;
-        }
-        .container {
-            text-align: center;
-            background-color: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            width: 90%;
-        }
-        h1 {
-            color: #007bff;
-            margin-bottom: 30px;
-        }
-        .menu-link {
-            display: block;
-            margin: 15px 0;
-            padding: 20px; /* Aumentei o padding para o "quadro" ficar maior */
-            text-decoration: none;
-            color: white;
-            font-weight: bold;
-            border-radius: 8px;
-            transition: background-color 0.3s, transform 0.2s;
-            font-size: 1.2em;
-        }
-        /* Links Principais */
-        .leitor-gabarito {
-            background-color: #007bff; /* Azul */
-        }
-        .leitor-gabarito:hover {
-            background-color: #0056b3;
-            transform: translateY(-2px);
-        }
-        .elaborador-questao {
-            background-color: #28a745; /* Verde */
-        }
-        .elaborador-questao:hover {
-            background-color: #1e7e34;
-            transform: translateY(-2px);
-        }
-        /* Link Secundário (Análise) */
-        .analise-resultados {
-            background-color: #ffc107; /* Amarelo/Laranja */
-            color: #333;
-        }
-        .analise-resultados:hover {
-            background-color: #e0a800;
-            transform: translateY(-2px);
-        }
-    </style>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Avaliação Inteligente (Menu Principal)</title>
+    <!-- O estilo em linha garante a prioridade máxima no ambiente Canvas. -->
 </head>
-<body>
-    <div class="container">
-        <h1>Sistema de Avaliação Inteligente 🤖</h1>
-        <p>Selecione a funcionalidade que deseja utilizar:</p>
-        
-                <a href="./elaborador/index.html" class="menu-link elaborador-questao">
-            📝 Elaboração de Questões
-        </a>
-        
-                <a href="./leitor/index.html" class="menu-link leitor-gabarito">
-            📸 Leitor de Gabaritos
-        </a>
-        
-                <a href="./analise/" class="menu-link analise-resultados">
-            📊 Análise de Resultados
-        </a>
-    </div>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f9; text-align: center; margin: 0; padding-top: 50px; min-height: 100vh;">
+    
+    <!-- Container Principal: Centralizado, caixa branca, e organiza os links em coluna -->
+    <div style="margin: 0 auto; background-color: white; padding: 40px; border-radius: 10px; max-width: 500px; width: 90%; display: flex; flex-direction: column; align-items: center; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);">
+        
+        <h1 style="color: #4a4a4a; margin-bottom: 30px; text-align: center; width: 100%;">Sistema de Avaliação Inteligente 🤖</h1>
+        
+        <!-- PARÁGRAFO AJUSTADO: Fonte aumentada para 1.4em -->
+        <p style="text-align: center; width: 100%; font-size: 1.4em; color: #555;">Selecione a funcionalidade que deseja utilizar:</p>
+        
+        <!-- Bloco 1: Elaboração de Questões (Verde) -->
+        <div style="width: 100%; display: flex; justify-content: center;">
+            <a href="./elaborador/index.html" 
+               style="display: block; box-sizing: border-box; 
+                      font-size: 1.6em; padding: 30px; 
+                      width: 90%; max-width: 450px; /* Largura AUMENTADA */
+                      margin: 15px auto; 
+                      text-decoration: none; 
+                      color: white; 
+                      font-weight: bold; 
+                      border-radius: 8px; 
+                      background-color: #28a745; 
+                      text-align: center;"> 
+            📝 Elaboração de Questões
+            </a>
+        </div>
+        
+        <!-- Bloco 2: Leitor de Gabaritos (Azul) -->
+        <div style="width: 100%; display: flex; justify-content: center;">
+            <a href="./leitor/index.html" 
+               style="display: block; box-sizing: border-box; 
+                      font-size: 1.6em; padding: 30px; 
+                      width: 90%; max-width: 450px; /* Largura AUMENTADA */
+                      margin: 15px auto; 
+                      text-decoration: none; 
+                      color: white; 
+                      font-weight: bold; 
+                      border-radius: 8px; 
+                      background-color: #007bff; 
+                      text-align: center;"> 
+            📸 Leitor de Gabaritos
+            </a>
+        </div>
+        
+        <!-- Bloco 3: Análise de Resultados (Amarelo/Laranja) -->
+        <div style="width: 100%; display: flex; justify-content: center;">
+            <a href="./analise/" 
+               style="display: block; box-sizing: border-box; 
+                      font-size: 1.6em; padding: 30px; 
+                      width: 90%; max-width: 450px; /* Largura AUMENTADA */
+                      margin: 15px auto; 
+                      text-decoration: none; 
+                      color: #333; 
+                      font-weight: bold; 
+                      border-radius: 8px; 
+                      background-color: #ffc107; 
+                      text-align: center;"> 
+            📊 Análise de Resultados
+            </a>
+        </div>
+    </div>
 </body>
 </html>
